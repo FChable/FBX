@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBX · Dashboard Carteira de Pedidos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;family=Nunito+Sans:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#08090f; --surface:#0e1018; --card:#12141e; --card2:#161924;
+  --border:#1e2235; --border2:#252840;
+  --blue:#4f8ef7; --blue2:#6ea8fe; --blue-dim:rgba(79,142,247,0.12);
+  --green:#22c55e; --green-dim:rgba(34,197,94,0.12);
+  --orange:#f97316; --orange-dim:rgba(249,115,22,0.12);
+  --red:#ef4444; --red-dim:rgba(239,68,68,0.12);
+  --purple:#a855f7; --purple-dim:rgba(168,85,247,0.12);
+  --cyan:#06b6d4; --yellow:#eab308;
+  --text:#e8ecf4; --muted:#5a6480; --muted2:#8892a4;
+  --font-display:'Nunito',sans-serif;
+  --font-body:'Nunito Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;min-height:100vh;overflow-x:hidden}
+
+/* NOISE OVERLAY */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+
+/* SIDEBAR */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;padding:0}
+.logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.logo-text{font-family:var(--font-display);font-size:1.3rem;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.logo-text span{color:var(--blue)}
+.logo-sub{font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);margin-top:3px;letter-spacing:0.05em}
+.nav{padding:16px 10px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--muted2);font-size:0.8rem;font-weight:500;transition:all .15s;margin-bottom:2px;border:1px solid transparent}
+.nav-item:hover{background:var(--blue-dim);color:var(--blue2);border-color:rgba(79,142,247,0.2)}
+.nav-item.active{background:var(--blue-dim);color:var(--blue2);border-color:rgba(79,142,247,0.25)}
+.nav-item .icon{font-size:1rem;width:20px;text-align:center}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+.upload-btn{width:100%;padding:10px;background:linear-gradient(135deg,rgba(79,142,247,0.2),rgba(168,85,247,0.15));border:1px solid rgba(79,142,247,0.3);border-radius:8px;color:var(--blue2);font-size:0.75rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font-body)}
+.upload-btn:hover{background:linear-gradient(135deg,rgba(79,142,247,0.35),rgba(168,85,247,0.25));border-color:rgba(79,142,247,0.5)}
+#fileInput{display:none}
+
+/* MAIN */
+.main{margin-left:220px;min-height:100vh;position:relative;z-index:1}
+
+/* TOPBAR */
+.topbar{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(14,16,24,0.8);backdrop-filter:blur(12px);position:sticky;top:0;z-index:50}
+.page-title{font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:#fff}
+.page-sub{font-size:0.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:1px}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.btn{padding:7px 14px;border-radius:7px;font-size:0.75rem;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--font-body);border:1px solid var(--border2);background:var(--card2);color:var(--muted2)}
+.btn:hover{border-color:var(--blue);color:var(--blue2)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#3b7de8}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* FILTERS BAR */
+.filters-bar{padding:14px 28px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface)}
+.filter-label{font-size:0.7rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.06em;margin-right:4px}
+select,input[type=date]{background:var(--card);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:7px;font-size:0.75rem;font-family:var(--font-body);cursor:pointer;outline:none;transition:border-color .15s}
+select:hover,select:focus,input[type=date]:hover,input[type=date]:focus{border-color:var(--blue)}
+select option{background:var(--card2)}
+.filter-divider{width:1px;height:24px;background:var(--border);margin:0 4px}
+.btn-clear{padding:5px 10px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:0.7rem;cursor:pointer;font-family:var(--font-body);transition:all .15s}
+.btn-clear:hover{border-color:var(--red);color:var(--red)}
+
+/* CONTENT */
+.content{padding:24px 28px}
+
+/* ALERTS BAR */
+.alerts-bar{margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap}
+.alert{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;font-size:0.78rem;font-weight:500;border:1px solid;animation:slideIn .4s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.alert.red{background:var(--red-dim);border-color:rgba(239,68,68,0.3);color:#fca5a5}
+.alert.orange{background:var(--orange-dim);border-color:rgba(249,115,22,0.3);color:#fdba74}
+.alert.yellow{background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.3);color:#fde047}
+.alert-icon{font-size:1rem}
+.alert-count{font-family:var(--font-mono);font-size:0.9rem;font-weight:500}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s}
+.kpi:hover{border-color:var(--border2);transform:translateY(-1px)}
+.kpi::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.02),transparent);pointer-events:none}
+.kpi-accent{position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-label{font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px}
+.kpi-value{font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#fff;line-height:1;letter-spacing:-0.02em}
+.kpi-sub{font-size:0.68rem;color:var(--muted2);margin-top:6px;display:flex;align-items:center;gap:4px}
+.kpi-delta{font-family:var(--font-mono);font-size:0.68rem;padding:2px 6px;border-radius:4px}
+.kpi-delta.up{background:var(--green-dim);color:var(--green)}
+.kpi-delta.down{background:var(--red-dim);color:var(--red)}
+
+/* SECTIONS */
+.section{display:none}
+.section.active{display:block}
+
+/* CHART GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-full{margin-bottom:16px}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:22px;transition:border-color .2s}
+.card:hover{border-color:var(--border2)}
+.card-title{font-family:var(--font-display);font-size:0.85rem;font-weight:700;color:#fff;letter-spacing:-0.01em}
+.card-sub{font-size:0.68rem;color:var(--muted);font-family:var(--font-mono);margin-top:3px;margin-bottom:16px}
+.chart-wrap{position:relative}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tab{padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all .15s;font-family:var(--font-body)}
+.tab.active{background:var(--blue-dim);border-color:rgba(79,142,247,0.35);color:var(--blue2)}
+
+/* VENDOR TABLE */
+.v-table{width:100%;border-collapse:collapse}
+.v-table th{text-align:left;font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.06em;padding:8px 10px;border-bottom:1px solid var(--border)}
+.v-table td{padding:10px 10px;font-size:0.78rem;border-bottom:1px solid rgba(30,34,53,0.7)}
+.v-table tr:last-child td{border:none}
+.v-table tr:hover td{background:rgba(79,142,247,0.04)}
+.rank-badge{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:700;font-family:var(--font-mono)}
+.r1{background:rgba(234,179,8,0.2);color:#eab308}
+.r2{background:rgba(148,163,184,0.15);color:#94a3b8}
+.r3{background:rgba(234,108,72,0.15);color:#ea6c48}
+.rn{background:rgba(79,142,247,0.08);color:var(--muted)}
+.bar-wrap{display:flex;align-items:center;gap:8px}
+.bar-bg{flex:1;height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .8s ease}
+.pct-text{font-family:var(--font-mono);font-size:0.65rem;color:var(--muted);min-width:32px}
+
+/* COMPARISON SECTION */
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.comp-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px}
+.comp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.comp-month{font-family:var(--font-display);font-size:1rem;font-weight:800}
+.comp-total{font-family:var(--font-mono);font-size:0.75rem;color:var(--muted2)}
+.comp-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.comp-kpi{background:var(--card2);border-radius:7px;padding:12px}
+.comp-kpi-label{font-size:0.62rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:4px}
+.comp-kpi-val{font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:#fff}
+
+/* ALERTS TABLE */
+.alerts-table{width:100%;border-collapse:collapse}
+.alerts-table th{text-align:left;font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border)}
+.alerts-table td{padding:9px 10px;font-size:0.76rem;border-bottom:1px solid rgba(30,34,53,0.5)}
+.status-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:600;font-family:var(--font-mono)}
+.pill-red{background:var(--red-dim);color:#fca5a5;border:1px solid rgba(239,68,68,0.25)}
+.pill-orange{background:var(--orange-dim);color:#fdba74;border:1px solid rgba(249,115,22,0.25)}
+.pill-yellow{background:rgba(234,179,8,0.1);color:#fde047;border:1px solid rgba(234,179,8,0.25)}
+
+/* UPLOAD SCREEN */
+.upload-screen{display:none;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:20px;text-align:center;padding:40px}
+.upload-screen.show{display:flex}
+.drop-zone{border:2px dashed var(--border2);border-radius:16px;padding:60px 80px;cursor:pointer;transition:all .2s;background:var(--card)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--blue);background:var(--blue-dim)}
+.drop-icon{font-size:3rem;margin-bottom:12px}
+.drop-title{font-family:var(--font-display);font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:6px}
+.drop-sub{font-size:0.8rem;color:var(--muted2)}
+
+/* LOADING */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(8,9,15,0.9);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading-overlay.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:var(--font-mono);font-size:0.8rem;color:var(--muted2)}
+
+/* PRODUCT BUTTONS */
+.pg-btn{padding:7px 16px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:1px solid var(--border2);background:transparent;color:var(--muted2);transition:all .18s}
+.pg-btn:hover{border-color:var(--blue);color:var(--blue2)}
+.pg-active-cyan{border:2px solid #06b6d4!important;background:rgba(6,182,212,0.15)!important;color:#06b6d4!important}
+.pg-active-blue{border:1px solid rgba(79,142,247,0.4)!important;background:rgba(79,142,247,0.15)!important;color:var(--blue2)!important}
+.pg-active-green{border:1px solid rgba(34,197,94,0.4)!important;background:rgba(34,197,94,0.15)!important;color:#4ade80!important}
+.pg-active-orange{border:2px solid #f97316!important;background:rgba(249,115,22,0.15)!important;color:#f97316!important}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Processando planilha...</div>
+</div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo" style="display:flex;align-items:center;gap:12px;padding:20px 20px 20px">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="18" cy="18" r="2.6" fill="#4f8ef7"></circle>
+      <path d="M18 18 Q22 11 27 14 Q32 18 27 23 Q22 28 18 24 Q11 21 12 15 Q13 8 19 7 Q26 6 30 12 Q34 18 30 24 Q25 31 18 31 Q9 31 5 24 Q1 17 6 10 Q11 3 19 3" stroke="url(#spiral)" stroke-width="1.8" fill="none" stroke-linecap="round"></path>
+      <defs><linearGradient id="spiral" x1="2" y1="2" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#4f8ef7"></stop><stop offset="45%" stop-color="#a855f7"></stop><stop offset="100%" stop-color="#06b6d4"></stop></linearGradient></defs>
+    </svg>
+    <div>
+      <div class="logo-text">FBX<span>.</span></div>
+      <div class="logo-sub">CARTEIRA DE PEDIDOS v2.0</div>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" onclick="showSection('overview')" id="nav-overview">
+      <span class="icon">⬡</span> Visão Geral
+    </div>
+    <div class="nav-item" onclick="showSection('comparison')" id="nav-comparison">
+      <span class="icon">⇄</span> Mar vs Abr
+    </div>
+    <div class="nav-item" onclick="showSection('vendors')" id="nav-vendors">
+      <span class="icon">◈</span> Vendedores
+    </div>
+    <div class="nav-item" onclick="showSection('products')" id="nav-products">
+      <span class="icon">◎</span> Produtos
+    </div>
+    <div class="nav-item" onclick="showSection('alerts')" id="nav-alerts">
+      <span class="icon">⚠</span> Alertas <span id="alertBadge" style="margin-left:auto;background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.3);padding:1px 6px;border-radius:4px;font-size:0.62rem;font-family:var(--font-mono)">6734</span>
+    </div>
+
+    <!-- VENDAS GROUP LABEL -->
+    <div style="margin-top:18px;margin-bottom:6px;padding:0 12px;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:0.6rem;font-family:var(--font-mono);color:var(--muted);letter-spacing:0.1em;text-transform:uppercase">VENDAS</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <div class="nav-item" onclick="showSection('carteira')" id="nav-carteira">
+      <span class="icon">📋</span> Carteira
+    </div>
+
+  </div>
+  <div class="sidebar-footer">
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">⊕ Nova Planilha</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">
+    <div style="margin-top:10px;font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-align:center" id="fileInfo">mars_abril.xlsx · Aba 4</div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="pageTitle">Visão Geral</div>
+      <div class="page-sub" id="pageSub">Mar–Abr 2026 · 84.248 registros</div>
+    </div>
+    <div class="topbar-actions">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--muted2)">
+        <div class="status-dot"></div> Dados carregados
+      </div>
+      <button class="btn" onclick="downloadApp()" style="border-color:rgba(34,197,94,0.4);color:#4ade80">⬇ Baixar App</button>
+      <button class="btn primary" onclick="exportPDF()">⬇ Exportar PDF</button>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters-bar" id="filtersBar">
+    <span class="filter-label">Filtros</span>
+    <select id="filterPeriod" onchange="applyFilters()">
+      <option value="all">Todos os períodos</option>
+      <option value="03">Março 2026</option>
+      <option value="04">Abril 2026</option>
+    </select>
+    <select id="filterStatus" onchange="applyFilters()">
+      <option value="all">Todos os status</option>
+    </select>
+    <select id="filterVendor" onchange="applyFilters()">
+      <option value="all">Todos os vendedores</option>
+    </select>
+    <select id="filterSubgrupo" onchange="applyFilters()">
+      <option value="all">Todos os subgrupos</option>
+    </select>
+    <div class="filter-divider"></div>
+    <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
+    <span style="font-family:var(--font-mono);font-size:0.68rem;color:var(--muted2);margin-left:8px" id="filterCount"></span>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ALERTS BAR -->
+    <div class="alerts-bar" id="alertsBar">
+    <div class="alert red"><span class="alert-icon">✕</span><span><b>5.860</b> pedidos cancelados</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">R$ 3.61M</span></div>
+    <div class="alert orange"><span class="alert-icon">⬡</span><span><b>67</b> bloqueados por estoque</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">R$ 555.2K</span></div>
+    <div class="alert yellow"><span class="alert-icon">◌</span><span><b>1.180</b> aguardando pagamento</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">R$ 1.61M</span></div></div>
+
+    <!-- ── OVERVIEW SECTION ─────────────────────────────────── -->
+    <div class="section active" id="section-overview">
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi">
+          <div class="kpi-accent" style="background:linear-gradient(90deg,var(--blue),var(--cyan))"></div>
+          <div class="kpi-label">Faturamento Total</div>
+          <div class="kpi-value" id="kpiFat">R$ 67.09M</div>
+          <div class="kpi-sub"><span class="kpi-delta up" id="kpiFatDelta">Mar + Abr 2026</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:linear-gradient(90deg,var(--green),#86efac)"></div>
+          <div class="kpi-label">Pedidos Únicos</div>
+          <div class="kpi-value" id="kpiPed">13.041</div>
+          <div class="kpi-sub"><span class="kpi-delta up" id="kpiPedDelta">pedidos</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:linear-gradient(90deg,var(--purple),#c084fc)"></div>
+          <div class="kpi-label">Clientes Únicos</div>
+          <div class="kpi-value" id="kpiCli">6.861</div>
+          <div class="kpi-sub"><span class="kpi-delta up" id="kpiCliDelta">clientes</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:linear-gradient(90deg,var(--orange),#fbbf24)"></div>
+          <div class="kpi-label">Ticket Médio</div>
+          <div class="kpi-value" id="kpiTicket">R$ 5.1K</div>
+          <div class="kpi-sub"><span class="kpi-delta up" id="kpiTicketDelta">por pedido</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:linear-gradient(90deg,var(--red),#f87171)"></div>
+          <div class="kpi-label">Pedidos Críticos</div>
+          <div class="kpi-value" id="kpiCrit" style="color:var(--red)">6.734</div>
+          <div class="kpi-sub"><span class="kpi-delta down" id="kpiCritDelta">cancelados + bloqueados</span></div>
+        </div>
+      </div>
+
+      <!-- Daily Chart -->
+      <div class="grid-full card">
+        <div class="card-title">Faturamento por Data de Emissão</div>
+        <div class="card-sub">VALOR TOTAL POR DIA · MARÇO &amp; ABRIL 2026</div>
+        <div class="tabs">
+          <button class="tab active" onclick="switchDaily('all',this)">Geral</button>
+          <button class="tab" onclick="switchDaily('mar',this)">Março</button>
+          <button class="tab" onclick="switchDaily('abr',this)">Abril</button>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartDaily" width="753" height="200" style="display: block; box-sizing: border-box; height: 200px; width: 753px;"></canvas></div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Status donut -->
+        <div class="card">
+          <div class="card-title">Status por Valor</div>
+          <div class="card-sub">DISTRIBUIÇÃO DE RECEITA POR STATUS</div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div class="chart-wrap" style="width:170px;height:170px;flex-shrink:0"><canvas id="chartStatusDonut" width="170" height="170" style="display: block; box-sizing: border-box; height: 170px; width: 170px;"></canvas></div>
+            <div id="statusLegend" style="flex:1;display:flex;flex-direction:column;gap:5px;max-height:170px;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#eab308;flex-shrink:0"></span>Aguardando Lib. Farmaceutico</span><span style="font-family:var(--font-mono);color:var(--muted)">1.8%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#eab308;flex-shrink:0"></span>Aguardando Malote</span><span style="font-family:var(--font-mono);color:var(--muted)">0.5%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#eab308;flex-shrink:0"></span>Aguardando Montagem dos Volume</span><span style="font-family:var(--font-mono);color:var(--muted)">27.4%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>Aguardando Lib. Financeira</span><span style="font-family:var(--font-mono);color:var(--muted)">0.0%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>Aguardando Pagamento</span><span style="font-family:var(--font-mono);color:var(--muted)">1.9%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>Aguardando Pagamento Final</span><span style="font-family:var(--font-mono);color:var(--muted)">0.5%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4;flex-shrink:0"></span>Aguardando Separacao</span><span style="font-family:var(--font-mono);color:var(--muted)">0.0%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4;flex-shrink:0"></span>Em Malote</span><span style="font-family:var(--font-mono);color:var(--muted)">10.0%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4;flex-shrink:0"></span>Em Manipulacao</span><span style="font-family:var(--font-mono);color:var(--muted)">11.7%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>Pedido Entregue</span><span style="font-family:var(--font-mono);color:var(--muted)">34.9%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>Pedido Reprovado</span><span style="font-family:var(--font-mono);color:var(--muted)">1.8%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>Pedido de Vendas</span><span style="font-family:var(--font-mono);color:var(--muted)">0.0%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>Pedido de Vendas Faturado</span><span style="font-family:var(--font-mono);color:var(--muted)">5.0%</span></div><div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>Pedido em Transporte</span><span style="font-family:var(--font-mono);color:var(--muted)">4.6%</span></div></div>
+          </div>
+        </div>
+        <!-- Grupo Pedidos -->
+        <div class="card">
+          <div class="card-title">Grupo de Pedidos</div>
+          <div class="card-sub">FATURAMENTO POR GRUPO (A1–A4)</div>
+          <div class="chart-wrap" style="height:80px;margin-bottom:10px"><canvas id="chartGrupoBar" width="348" height="80" style="display: block; box-sizing: border-box; height: 80px; width: 348px;"></canvas></div>
+          <div id="grupoLegend" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><div style="background:rgba(234,179,8,0.15);border:1px solid #eab30833;border-radius:7px;padding:8px 10px"><div style="font-size:0.62rem;color:#eab308;font-family:var(--font-mono);font-weight:700;margin-bottom:3px">PRÉ PRODUÇÃO</div><div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#fff">R$ 19.76M</div><div style="font-size:0.62rem;color:var(--muted);margin-top:2px">7.407 ped. · 29.3%</div></div><div style="background:rgba(239,68,68,0.15);border:1px solid #ef444433;border-radius:7px;padding:8px 10px"><div style="font-size:0.62rem;color:#ef4444;font-family:var(--font-mono);font-weight:700;margin-bottom:3px">FINANCEIRO</div><div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#fff">R$ 1.61M</div><div style="font-size:0.62rem;color:var(--muted);margin-top:2px">1.180 ped. · 2.4%</div></div><div style="background:rgba(6,182,212,0.15);border:1px solid #06b6d433;border-radius:7px;padding:8px 10px"><div style="font-size:0.62rem;color:#06b6d4;font-family:var(--font-mono);font-weight:700;margin-bottom:3px">EM PRODUÇÃO</div><div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#fff">R$ 14.70M</div><div style="font-size:0.62rem;color:var(--muted);margin-top:2px">17.193 ped. · 21.8%</div></div><div style="background:rgba(34,197,94,0.15);border:1px solid #22c55e33;border-radius:7px;padding:8px 10px"><div style="font-size:0.62rem;color:#22c55e;font-family:var(--font-mono);font-weight:700;margin-bottom:3px">FATURADOS</div><div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#fff">R$ 31.35M</div><div style="font-size:0.62rem;color:var(--muted);margin-top:2px">31.471 ped. · 46.5%</div></div></div>
+        </div>
+        <!-- Subgrupos -->
+        <div class="card">
+          <div class="card-title">Subgrupos de Produto</div>
+          <div class="card-sub">FATURAMENTO POR LINHA DE PRODUTO</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="chartSubgrupo" width="343" height="200" style="display: block; box-sizing: border-box; height: 200px; width: 343px;"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Transportadoras -->
+        <div class="card">
+          <div class="card-title">Modal de Entrega</div>
+          <div class="card-sub">VOLUME DE PEDIDOS POR TRANSPORTADORA</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="chartTransp" width="345" height="200" style="display: block; box-sizing: border-box; height: 200px; width: 345px;"></canvas></div>
+        </div>
+        <!-- Status qtd -->
+        <div class="card">
+          <div class="card-title">Status por Quantidade</div>
+          <div class="card-sub">NÚMERO DE PEDIDOS POR STATUS</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="chartStatusQtd" width="345" height="200" style="display: block; box-sizing: border-box; height: 200px; width: 345px;"></canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /overview -->
+
+    <!-- ── COMPARISON SECTION ───────────────────────────────── -->
+    <div class="section" id="section-comparison">
+      <div class="comp-grid">
+        <div class="comp-card">
+          <div class="comp-header">
+            <div class="comp-month" style="color:var(--blue)">◈ Março 2026</div>
+            <div class="comp-total" id="marTotal">R$ 34,1M</div>
+          </div>
+          <div class="comp-kpis" id="marKpis"></div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chartMar"></canvas></div>
+        </div>
+        <div class="comp-card">
+          <div class="comp-header">
+            <div class="comp-month" style="color:var(--green)">◈ Abril 2026</div>
+            <div class="comp-total" id="aprTotal">R$ 62,1M</div>
+          </div>
+          <div class="comp-kpis" id="aprKpis"></div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chartApr"></canvas></div>
+        </div>
+      </div>
+      <!-- Side by side bar -->
+      <div class="card">
+        <div class="card-title">Comparativo Diário — Março vs Abril</div>
+        <div class="card-sub">FATURAMENTO DIÁRIO SOBREPOSTOS POR DIA DO MÊS</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="chartCompare"></canvas></div>
+      </div>
+      <!-- Status comparison -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Status dos Pedidos — Março vs Abril</div>
+        <div class="card-sub">COMPARATIVO DE VOLUME POR STATUS</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="chartStatusComp"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── VENDORS SECTION ──────────────────────────────────── -->
+    <div class="section" id="section-vendors">
+      <div class="card grid-full">
+        <div class="card-title">🏆 Ranking de Vendedores</div>
+        <div class="card-sub">FATURAMENTO TOTAL POR VENDEDOR NO PERÍODO</div>
+        <div class="chart-wrap" style="height:240px;margin-bottom:20px"><canvas id="chartVendors"></canvas></div>
+        <table class="v-table" id="vendorTable"></table>
+      </div>
+    </div>
+
+    <!-- ── ALERTS SECTION ───────────────────────────────────── -->
+    <div class="section" id="section-alerts">
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card" style="border-color:rgba(239,68,68,0.25)">
+          <div class="card-title" style="color:var(--red)">⚠ Pedidos Cancelados</div>
+          <div class="card-sub">IMPACTO FINANCEIRO DE PEDIDOS CANCELADOS</div>
+          <div style="font-family:var(--font-display);font-size:2rem;font-weight:800;color:var(--red)" id="cancelVal">—</div>
+          <div style="font-size:0.72rem;color:var(--muted2);margin-top:4px" id="cancelQtd">—</div>
+        </div>
+        <div class="card" style="border-color:rgba(249,115,22,0.25)">
+          <div class="card-title" style="color:var(--orange)">⬡ Pedidos Bloqueados por Estoque</div>
+          <div class="card-sub">PEDIDOS AGUARDANDO LIBERAÇÃO DE ESTOQUE</div>
+          <div style="font-family:var(--font-display);font-size:2rem;font-weight:800;color:var(--orange)" id="bloqVal">—</div>
+          <div style="font-size:0.72rem;color:var(--muted2);margin-top:4px" id="bloqQtd">—</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card" style="border-color:rgba(234,179,8,0.2)">
+          <div class="card-title" style="color:var(--yellow)">◌ Aguardando Pagamento</div>
+          <div class="card-sub">PEDIDOS PENDENTES DE CONFIRMAÇÃO DE PAGAMENTO</div>
+          <div style="font-family:var(--font-display);font-size:2rem;font-weight:800;color:var(--yellow)" id="pagVal">—</div>
+          <div style="font-size:0.72rem;color:var(--muted2);margin-top:4px" id="pagQtd">—</div>
+        </div>
+        <div class="card" style="border-color:rgba(239,68,68,0.15)">
+          <div class="card-title" style="color:#f87171">◌ Pedidos Reprovados</div>
+          <div class="card-sub">PEDIDOS REPROVADOS NO PERÍODO</div>
+          <div style="font-family:var(--font-display);font-size:2rem;font-weight:800;color:#f87171" id="reprovVal">—</div>
+          <div style="font-size:0.72rem;color:var(--muted2);margin-top:4px" id="reprovQtd">—</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Distribuição de Alertas por Vendedor</div>
+        <div class="card-sub">TOP VENDEDORES COM MAIS PEDIDOS CRÍTICOS</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartAlertVendor"></canvas></div>
+      </div>
+    </div>
+
+
+    <!-- ── PRODUCTS SECTION ──────────────────────────────────── -->
+    <div class="section" id="section-products">
+
+      <!-- Controls row -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+
+        <!-- Group -->
+        <div style="display:flex;gap:6px">
+          <button id="btnGelado" onclick="setGrupo('GELADO')" class="pg-btn pg-active-cyan">❄ GELADO</button>
+          <button id="btnSeco" onclick="setGrupo('SECO')" class="pg-btn">☀ SECO</button>
+        </div>
+
+        <div style="width:1px;height:28px;background:var(--border);margin:0 4px"></div>
+
+        <!-- Period -->
+        <div style="display:flex;gap:6px">
+          <button id="btnProdMar" onclick="setProdPeriod('mar')" class="pg-btn pg-active-blue">Março</button>
+          <button id="btnProdAbr" onclick="setProdPeriod('abr')" class="pg-btn">Abril</button>
+        </div>
+
+        <div style="width:1px;height:28px;background:var(--border);margin:0 4px"></div>
+
+        <!-- View -->
+        <div style="display:flex;gap:6px">
+          <button id="btnViewVal" onclick="setProdView('val')" class="pg-btn pg-active-blue">R$ Faturamento</button>
+          <button id="btnViewQtd" onclick="setProdView('qtd')" class="pg-btn">📦 Qtd A1+A3</button>
+        </div>
+
+        <span style="margin-left:auto;font-family:var(--font-mono);font-size:0.7rem;color:var(--muted)" id="prodGroupLabel"></span>
+      </div>
+
+      <!-- Date filter row -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap" id="dateFilterRow">
+        <span style="font-size:0.68rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:0.06em">Filtrar por dia</span>
+        <div id="datePillsWrap" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+        <button onclick="clearDateFilter()" id="btnClearDate" style="display:none;padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#fca5a5">✕ Limpar dia</button>
+        <span id="dateFilterLabel" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--muted2)"></span>
+      </div>
+
+      <!-- KPI row -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px" id="prodKpis"></div>
+
+      <!-- DUAL CHART ROW: bar ranking + line daily -->
+      <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:16px;margin-bottom:16px">
+
+        <!-- Bar: ranking snapshot -->
+        <div class="card">
+          <div class="card-title" id="prodBarTitle">Ranking Geral do Período</div>
+          <div class="card-sub">VALOR TOTAL · CLIQUE PARA ISOLAR</div>
+          <div class="chart-wrap" style="height:240px"><canvas id="chartProdBar"></canvas></div>
+        </div>
+
+        <!-- Line: daily evolution -->
+        <div class="card">
+          <div class="card-title" id="prodChartTitle">Evolução Diária por Produto</div>
+          <div class="card-sub">DIA A DIA · PASSE O MOUSE PARA DETALHES</div>
+          <div class="chart-wrap" style="height:240px"><canvas id="chartProdDaily"></canvas></div>
+        </div>
+
+      </div>
+
+      <!-- Stacked area: qty A1+A3 per day -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" id="prodQtdTitle">Quantidade Diária A1+A3 — Em Produção + Pré Produção</div>
+        <div class="card-sub">PEÇAS POR DIA · ORDENS A1 E A3 · ÁREA EMPILHADA</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartProdQtd"></canvas></div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-title" id="prodRankTitle">Tabela de Produtos</div>
+        <div class="card-sub">FATURAMENTO + QUANTIDADE A1+A3 NO PERÍODO · <span style="color:var(--blue2)">CLIQUE NA LINHA PARA SELECIONAR O PRODUTO</span></div>
+        <table class="v-table" id="prodRankTable"></table>
+      </div>
+
+    </div>
+
+    <!-- ── CARTEIRA SECTION ─────────────────────────────────── -->
+    <div class="section" id="section-carteira">
+
+      <!-- FILTROS CARTEIRA -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+        <span style="font-size:0.65rem;font-family:var(--font-mono);color:var(--muted);letter-spacing:0.08em;text-transform:uppercase">Filtros Carteira</span>
+        <div style="width:1px;height:22px;background:var(--border)"></div>
+
+        <!-- Filtro Mês -->
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:0.68rem;color:var(--muted2);font-family:var(--font-mono)">Mês</span>
+          <button id="cw-btn-todos" onclick="cwSetMes('todos')" class="pg-btn pg-active-blue" style="padding:5px 14px;font-size:0.72rem">Todos</button>
+          <button id="cw-btn-mar" onclick="cwSetMes('mar')" class="pg-btn" style="padding:5px 14px;font-size:0.72rem">Março</button>
+          <button id="cw-btn-abr" onclick="cwSetMes('abr')" class="pg-btn" style="padding:5px 14px;font-size:0.72rem">Abril</button>
+        </div>
+
+        <div style="width:1px;height:22px;background:var(--border)"></div>
+
+        <!-- Filtro Grupo Produção -->
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:0.68rem;color:var(--muted2);font-family:var(--font-mono)">Produção</span>
+          <button id="cw-btn-ambos" onclick="cwSetGrupo('ambos')" class="pg-btn pg-active-blue" style="padding:5px 14px;font-size:0.72rem">Todos</button>
+          <button id="cw-btn-gelado" onclick="cwSetGrupo('gelado')" class="pg-btn" style="padding:5px 14px;font-size:0.72rem">❄ Gelado</button>
+          <button id="cw-btn-seco" onclick="cwSetGrupo('seco')" class="pg-btn" style="padding:5px 14px;font-size:0.72rem">☀ Seco</button>
+        </div>
+
+        <div style="width:1px;height:22px;background:var(--border)"></div>
+
+        <!-- Filtro Dia -->
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:0.68rem;color:var(--muted2);font-family:var(--font-mono)">Dia</span>
+          <select id="cw-select-dia" onchange="cwSetDia(this.value)" style="background:var(--card);border:1px solid var(--border2);color:var(--text);padding:5px 10px;border-radius:7px;font-size:0.72rem;font-family:var(--font-body);cursor:pointer;outline:none;min-width:110px">
+            <option value="todos">Todos os dias</option>
+          </select>
+          <button id="cw-btn-clear-dia" onclick="cwSetDia('todos')" style="display:none;padding:4px 9px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#fca5a5">✕</button>
+        </div>
+
+        <div style="margin-left:auto;font-family:var(--font-mono);font-size:0.68rem;color:var(--muted)" id="cw-filter-label">A1 · Pré Produção + A3 · Em Produção</div>
+      </div>
+
+      <!-- KPI CARDS ROW -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px" id="cw-kpis">
+        <!-- preenchido via JS -->
+      </div>
+
+      <!-- ROW 1: Evolução diária + Ranking quantidade -->
+      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Evolução diária de valor -->
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div>
+              <div class="card-title">📈 Evolução Diária de Faturamento</div>
+              <div class="card-sub">VALOR TOTAL PRÉ PRODUÇÃO + EM PRODUÇÃO POR DIA · MARÇO & ABRIL</div>
+            </div>
+            <div style="display:flex;gap:6px" id="cw-legend-daily"></div>
+          </div>
+          <div class="chart-wrap" style="height:220px"><canvas id="cw-chart-daily"></canvas></div>
+        </div>
+
+        <!-- Ranking por quantidade -->
+        <div class="card">
+          <div class="card-title">🏆 Top Produtos por Quantidade</div>
+          <div class="card-sub">UNIDADES EM PRÉ PRODUÇÃO + EM PRODUÇÃO NO PERÍODO SELECIONADO</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="cw-chart-qtd-rank"></canvas></div>
+        </div>
+
+      </div>
+
+      <!-- ROW 2: Donut grupos A1 vs A3 + Heatmap semanal + Pizza produção -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Donut A1 vs A3 -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-title">⚖ PRÉ PRODUÇÃO vs EM PRODUÇÃO</div>
+          <div class="card-sub">VALOR POR GRUPO DE PEDIDO</div>
+          <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center">
+            <div class="chart-wrap" style="height:180px;width:100%"><canvas id="cw-chart-donut-grupo"></canvas></div>
+          </div>
+          <div id="cw-donut-legend" style="display:flex;justify-content:center;gap:18px;margin-top:8px"></div>
+        </div>
+
+        <!-- Donut Gelado vs Seco -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-title">❄☀ Gelado vs Seco</div>
+          <div class="card-sub">VALOR POR TIPO DE PRODUÇÃO</div>
+          <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center">
+            <div class="chart-wrap" style="height:180px;width:100%"><canvas id="cw-chart-donut-tipo"></canvas></div>
+          </div>
+          <div id="cw-tipo-legend" style="display:flex;justify-content:center;gap:18px;margin-top:8px"></div>
+        </div>
+
+        <!-- Top 5 por valor -->
+        <div class="card">
+          <div class="card-title">💰 Top 5 por Faturamento</div>
+          <div class="card-sub">VALOR TOTAL NO PERÍODO SELECIONADO</div>
+          <div id="cw-top5-val" style="margin-top:10px"></div>
+        </div>
+
+      </div>
+
+      <!-- ROW 3: Tabela completa de produtos -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div>
+            <div class="card-title">📋 Tabela Completa de Produtos — Carteira A1 + A3</div>
+            <div class="card-sub">FATURAMENTO E QUANTIDADE POR PRODUTO · GRUPO A1 (PRÉ PRODUÇÃO) E A3 (EM PRODUÇÃO)</div>
+          </div>
+          <div id="cw-table-total" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--muted2)"></div>
+        </div>
+        <table class="v-table" id="cw-table" style="margin-top:8px"></table>
+      </div>
+
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let RAW = [], FILTERED = [], charts = {};
+const PALETTE = ['#4f8ef7','#22c55e','#f97316','#a855f7','#ef4444','#06b6d4','#eab308','#ec4899','#14b8a6','#8b5cf6','#f59e0b','#10b981','#3b82f6','#84cc16'];
+const fmt = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(2)+'M' : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(1)+'K' : 'R$ '+v.toFixed(0);
+const fmtFull = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2});
+const num = v => v.toLocaleString('pt-BR');
+
+// ─── BUILT-IN DATA ────────────────────────────────────────────────────────────
+const PRODUCTS = {"gelado": [{"name": "FR TIRZEPATIDA 60MG/2,4ML", "cod": "PA04050003", "val": 68979256.91, "qtd_a1a3": 22459.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 22459.0, "daily_mar": {"19": 2206376.45, "23": 2128211.52, "20": 1847646.71, "25": 2286745.07, "24": 2051034.66, "26": 2457027.88, "30": 2332615.96, "31": 2523408.53, "17": 812291.26, "18": 1585666.07, "11": 10546.2, "27": 1875746.62, "13": 10546.2}, "daily_apr": {"5": 16200.0, "1": 2222260.8, "2": 2493689.54, "6": 4483289.54, "7": 3255694.39, "16": 3263869.28, "8": 3167502.08, "9": 2725238.22, "10": 2431421.84, "13": 2634004.59, "15": 2950533.1, "28": 117228.75, "22": 6528962.68, "23": 4697206.68, "17": 2541355.63, "14": 2177678.39, "24": 380228.69, "3": 375786.28, "27": 367163.3, "20": 20220.0, "21": 1860.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"5": 10.0, "7": 2094.0, "16": 2046.0, "8": 1862.0, "9": 1921.0, "10": 1547.0, "13": 1617.0, "15": 1848.0, "22": 3796.0, "28": 27.0, "23": 1809.0, "17": 1690.0, "14": 1185.0, "6": 816.0, "27": 13.0, "24": 170.0, "2": 8.0}}, {"name": "FR TIRZEPATIDA 93,6MG/3,6ML", "cod": "PA04050004", "val": 3856457.85, "qtd_a1a3": 1202.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 1202.0, "daily_mar": {}, "daily_apr": {"22": 1622186.55, "23": 1643543.94, "16": 92687.91, "17": 315890.64, "27": 94554.33, "20": 36921.36, "24": 50673.12}, "daily_qtd_mar": {}, "daily_qtd_abr": {"22": 563.0, "23": 525.0, "17": 91.0, "24": 23.0}}, {"name": "FR TIRZEPATIDA 20MG/0,8ML", "cod": "PA04050001", "val": 767400.58, "qtd_a1a3": 666.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 666.0, "daily_mar": {"18": 713.0}, "daily_apr": {"27": 396444.91, "23": 198487.98, "2": 2852.0, "22": 64537.16, "6": 8520.0, "7": 15300.0, "8": 17652.93, "28": 16220.0, "15": 8100.2, "16": 26295.2, "24": 12277.2}, "daily_qtd_mar": {}, "daily_qtd_abr": {"27": 525.0, "28": 20.0, "23": 91.0, "24": 30.0}}], "seco": [{"name": "AMP VD3 600.000+VK2 1.300+VA 50.000+VE 500UI 1ML", "cod": "PA05110010", "val": 1268298.78, "qtd_a1a3": 3781.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 3781.0, "daily_mar": {"19": 40767.2, "23": 38944.3, "20": 33943.1, "25": 155399.6, "26": 96227.0, "11": 25792.69, "6": 35407.8, "9": 30468.3, "12": 44392.6, "17": 36455.7, "13": 33072.1, "16": 44315.19, "5": 15475.9, "10": 27834.6, "27": 30969.9, "24": 20473.1, "18": 27924.0, "30": 1950.3, "4": 8573.0, "3": 664.0}, "daily_apr": {"16": 52213.6, "20": 102765.5, "27": 114088.65, "28": 93972.1, "22": 104072.15, "14": 16565.9, "15": 32858.4, "17": 650.1, "29": 1398.0, "7": 664.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"22": 923.0, "27": 950.0, "28": 413.0, "14": 40.0, "20": 875.0, "15": 230.0, "16": 330.0, "29": 20.0}}, {"name": "FR HCG 5000UI", "cod": "PA05070001", "val": 1062195.85, "qtd_a1a3": 866.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 866.0, "daily_mar": {"20": 94250.6, "25": 131471.1, "27": 19792.5, "26": 64860.25, "16": 45932.25, "13": 42432.0, "19": 22059.31, "10": 23522.32, "5": 18675.87, "24": 20133.75, "4": 4095.0, "18": 24062.23, "11": 65692.69, "17": 13328.25, "6": 24528.95, "30": 3900.0, "23": 25238.85, "12": 51821.25, "9": 11426.96, "31": 370.5}, "daily_apr": {"16": 26477.09, "15": 44918.25, "28": 36718.2, "27": 75767.23, "29": 14078.75, "20": 27309.9, "22": 98941.05, "14": 30390.75}, "daily_qtd_mar": {}, "daily_qtd_abr": {"28": 69.0, "29": 80.0, "20": 106.0, "22": 251.0, "15": 185.0, "27": 121.0, "14": 18.0, "16": 36.0}}, {"name": "AMP COENZIMA Q10 50MG/ML(100MG) 2ML", "cod": "PA05060045", "val": 999110.27, "qtd_a1a3": 9715.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 9715.0, "daily_mar": {"23": 39293.2, "20": 26893.76, "25": 84923.26, "26": 106714.71, "9": 19499.1, "16": 28811.0, "17": 23258.6, "19": 28590.32, "18": 19292.9, "10": 21738.74, "6": 21401.0, "12": 44479.5, "13": 22877.89, "4": 4714.4, "24": 19207.6, "5": 15437.2, "27": 19141.08, "11": 29671.46, "30": 510.0}, "daily_apr": {"16": 35843.82, "17": 1239.2, "20": 64550.9, "27": 88823.0, "28": 77178.33, "22": 101868.1, "15": 29450.2, "14": 17530.7, "29": 4959.3, "2": 968.8, "7": 242.2}, "daily_qtd_mar": {}, "daily_qtd_abr": {"20": 1514.0, "28": 1337.0, "22": 2783.0, "27": 2357.0, "14": 220.0, "16": 744.0, "15": 720.0, "29": 40.0}}, {"name": "FR LC+MO+IN+CA+FU+LI 5ML", "cod": "PA05060012", "val": 934776.1, "qtd_a1a3": 6328.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 6328.0, "daily_mar": {"23": 28865.0, "20": 31540.0, "25": 58498.8, "10": 29427.2, "19": 18410.2, "18": 51194.4, "13": 30170.6, "26": 70308.8, "9": 18421.4, "12": 22740.0, "6": 16732.0, "4": 12257.2, "16": 25310.0, "11": 12276.4, "27": 15994.0, "17": 29688.0, "24": 10137.5, "5": 12104.0, "30": 120.0, "31": 760.0}, "daily_apr": {"14": 20584.0, "27": 77454.0, "22": 94390.0, "28": 109852.0, "20": 57957.5, "16": 44400.7, "15": 21276.0, "23": 400.0, "29": 7720.0, "2": 1940.0, "7": 400.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"14": 164.0, "27": 1527.0, "22": 1547.0, "28": 1476.0, "20": 642.0, "16": 589.0, "15": 383.0}}, {"name": "AMP VIT B12(METIL) 2500MCG 1ML", "cod": "PA05110014", "val": 718462.14, "qtd_a1a3": 15262.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 15262.0, "daily_mar": {"23": 9719.46, "20": 22077.22, "26": 42358.9, "9": 14244.62, "17": 17697.45, "25": 28789.57, "19": 30570.04, "18": 13787.26, "10": 18636.19, "6": 13233.42, "13": 17960.01, "16": 18384.27, "24": 3101.38, "5": 9341.42, "12": 20136.5, "11": 12961.41, "27": 9547.67, "31": 162.4, "4": 4232.7}, "daily_apr": {"16": 35745.2, "22": 131143.13, "23": 684.0, "27": 52134.3, "28": 61514.78, "20": 64869.2, "14": 37129.74, "15": 23986.2, "29": 3482.8, "17": 660.0, "1": 8.5, "7": 162.4}, "daily_qtd_mar": {}, "daily_qtd_abr": {"27": 1970.0, "28": 1545.0, "22": 7712.0, "14": 340.0, "20": 2150.0, "16": 855.0, "15": 620.0, "29": 70.0}}, {"name": "AMP VITAMINA D3 600000UI/ML", "cod": "PA05110006", "val": 710315.38, "qtd_a1a3": 11044.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 11044.0, "daily_mar": {"23": 20094.75, "20": 20233.45, "25": 56402.85, "27": 10777.6, "17": 15211.34, "19": 39931.9, "26": 37974.63, "18": 51821.8, "10": 10796.1, "11": 8670.5, "6": 6475.44, "9": 12512.1, "13": 21661.25, "4": 2223.9, "16": 17394.02, "12": 17937.1, "24": 11897.84, "31": 194.7, "5": 5686.44, "30": 686.7}, "daily_apr": {"27": 54203.5, "16": 21408.4, "22": 88492.6, "23": 1025.0, "28": 72952.4, "20": 41181.1, "14": 42013.57, "29": 3162.7, "15": 15861.1, "17": 600.6, "1": 30.6, "2": 389.4}, "daily_qtd_mar": {}, "daily_qtd_abr": {"27": 1790.0, "22": 3905.0, "14": 280.0, "28": 2890.0, "16": 400.0, "20": 1229.0, "15": 460.0, "29": 90.0}}, {"name": "FR AC ALFA LIPOICO 600MG 30ML", "cod": "PA05060133", "val": 569083.52, "qtd_a1a3": 2435.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 2435.0, "daily_mar": {"23": 13577.3, "20": 7888.7, "25": 51855.15, "9": 13511.3, "16": 13403.95, "26": 52678.75, "24": 22169.4, "10": 14340.2, "17": 17129.7, "11": 10045.9, "6": 18531.5, "27": 3963.2, "13": 9333.1, "18": 2814.0, "12": 14890.7, "5": 1986.15, "19": 13201.7, "4": 1407.0, "30": 1125.6}, "daily_apr": {"28": 55765.45, "22": 46776.7, "27": 63002.52, "20": 61975.15, "15": 17990.7, "29": 4591.6, "14": 8531.1, "16": 24252.0, "23": 2345.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"28": 300.0, "22": 736.0, "20": 350.0, "27": 550.0, "16": 304.0, "29": 70.0, "15": 105.0, "14": 20.0}}, {"name": "AMP VIT B6 30MG+METILF 3500MCG+VIT B12 2500MCG 2ML", "cod": "PA05060128", "val": 551656.94, "qtd_a1a3": 3339.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 3339.0, "daily_mar": {"19": 12814.1, "23": 37810.0, "25": 85549.25, "26": 60550.72, "27": 16663.6, "10": 12677.4, "20": 15732.2, "4": 3286.8, "24": 9023.8, "12": 16816.01, "11": 15565.4, "16": 7881.72, "6": 15000.0, "9": 10742.0, "17": 4653.6, "5": 4980.0, "13": 8190.4, "18": 996.0}, "daily_apr": {"16": 19171.1, "29": 664.0, "22": 30711.9, "20": 53979.7, "27": 50809.32, "28": 43898.72, "14": 7619.4, "15": 5537.8, "23": 332.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"29": 20.0, "22": 535.0, "20": 934.0, "14": 50.0, "27": 796.0, "16": 321.0, "28": 623.0, "15": 60.0}}, {"name": "NADH 200MG IN", "cod": "PA05100035", "val": 532253.17, "qtd_a1a3": 497.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 497.0, "daily_mar": {"23": 19125.96, "24": 4814.21, "26": 19478.64, "13": 16842.04, "25": 23666.28, "20": 17165.21, "5": 4466.36, "16": 12035.52, "11": 14146.51, "12": 14910.04, "19": 30638.07, "17": 7770.51, "9": 8471.52, "4": 1953.73, "18": 5293.29, "6": 6531.81, "30": 222.01, "10": 6029.36}, "daily_apr": {"28": 50158.98, "22": 31404.36, "20": 43327.92, "27": 47256.37, "9": 116850.0, "15": 6835.67, "16": 11311.02, "14": 2276.23, "29": 1402.2, "1": 3739.2, "17": 3330.15}, "daily_qtd_mar": {}, "daily_qtd_abr": {"28": 108.0, "22": 110.0, "27": 141.0, "15": 27.0, "16": 9.0, "20": 95.0, "29": 6.0, "14": 1.0}}, {"name": "FR NADH 50MG", "cod": "PA05070002", "val": 509545.68, "qtd_a1a3": 2016.0, "qtd_a1a3_mar": 0, "qtd_a1a3_abr": 2016.0, "daily_mar": {"19": 17943.84, "25": 32184.2, "26": 54055.54, "16": 19127.52, "10": 8325.1, "6": 8909.3, "20": 10442.88, "12": 10747.76, "27": 12799.8, "24": 11597.3, "18": 3137.6, "9": 12816.8, "17": 7416.1, "13": 9338.8, "4": 4169.38, "23": 11046.7, "11": 13506.5, "5": 7518.4, "30": 634.1}, "daily_apr": {"16": 24714.0, "22": 53725.86, "20": 40895.1, "27": 49375.7, "28": 56997.4, "29": 1480.0, "14": 12580.0, "15": 12668.8, "3": 59.2, "7": 562.4, "8": 592.0}, "daily_qtd_mar": {}, "daily_qtd_abr": {"22": 504.0, "28": 395.0, "20": 407.0, "27": 480.0, "29": 5.0, "14": 20.0, "16": 95.0, "15": 110.0}}]};const STATUS_MAP = {
+  "Aguardando Lib. Farmaceutico": {ordem:"A1",grupo:"PRÉ PRODUÇÃO"},
+  "Aguardando Malote":            {ordem:"A1",grupo:"PRÉ PRODUÇÃO"},
+  "Aguardando Montagem dos Volume":{ordem:"A1",grupo:"PRÉ PRODUÇÃO"},
+  "Aguardando Lib. Financeira":   {ordem:"A2",grupo:"FINANCEIRO"},
+  "Aguardando Pagamento":         {ordem:"A2",grupo:"FINANCEIRO"},
+  "Aguardando Pagamento Final":   {ordem:"A2",grupo:"FINANCEIRO"},
+  "Aguardando Separacao":         {ordem:"A3",grupo:"EM PRODUÇÃO"},
+  "Em Malote":                    {ordem:"A3",grupo:"EM PRODUÇÃO"},
+  "Em Manipulacao":               {ordem:"A3",grupo:"EM PRODUÇÃO"},
+  "Pedido Entregue":              {ordem:"A4",grupo:"FATURADOS"},
+  "Pedido Reprovado":             {ordem:"A4",grupo:"FATURADOS"},
+  "Pedido de Vendas":             {ordem:"A4",grupo:"FATURADOS"},
+  "Pedido de Vendas Faturado":    {ordem:"A4",grupo:"FATURADOS"},
+  "Pedido em Transporte":         {ordem:"A4",grupo:"FATURADOS"},
+};
+const GRUPO_COLORS = {"PRÉ PRODUÇÃO":"#eab308","FINANCEIRO":"#ef4444","EM PRODUÇÃO":"#06b6d4","FATURADOS":"#22c55e"};
+const GRUPO_COLORS_DIM = {"PRÉ PRODUÇÃO":"rgba(234,179,8,0.15)","FINANCEIRO":"rgba(239,68,68,0.15)","EM PRODUÇÃO":"rgba(6,182,212,0.15)","FATURADOS":"rgba(34,197,94,0.15)"};
+
+const BUILTIN = {
+  marchDaily:{3:1411.5,4:126718,5:293813,6:419107,9:505323,10:438947,11:488102,12:653890,13:722629,16:692078,17:1318733,18:2088157,19:2923792,20:2611404,23:2971667,24:2460300,25:4021372,26:4116098,27:2370209,30:2355141,31:2534173},
+  aprilDaily:{1:2259862,2:2503490,3:375845,5:16200,6:4497399,7:3276080,8:3188761,9:3819654,10:2431421,13:2634004,14:2696918,15:3584542,16:4285511,17:2893490,20:1707551,22:10194322,23:6613604,24:443179,27:2686634,28:1922569,29:108408},
+  statusVal:{"Aguardando Lib. Farmaceutico":1206501,"Aguardando Malote":362098,"Aguardando Montagem dos Volume":18557670,"Aguardando Lib. Financeira":1328,"Aguardando Pagamento":1296394,"Aguardando Pagamento Final":312818,"Aguardando Separacao":22369,"Em Malote":6757948,"Em Manipulacao":7919384,"Pedido Entregue":23633066,"Pedido Reprovado":1202512,"Pedido de Vendas":44,"Pedido de Vendas Faturado":3421860,"Pedido em Transporte":3093170},
+  statusQtd:{"Aguardando Lib. Farmaceutico":1368,"Aguardando Malote":209,"Aguardando Montagem dos Volume":5830,"Aguardando Lib. Financeira":6,"Aguardando Pagamento":1055,"Aguardando Pagamento Final":119,"Aguardando Separacao":8,"Em Malote":14791,"Em Manipulacao":2394,"Pedido Entregue":25004,"Pedido Reprovado":874,"Pedido de Vendas":5,"Pedido de Vendas Faturado":3899,"Pedido em Transporte":1693},
+  grupoVal:{"PRÉ PRODUÇÃO":19764171,"FINANCEIRO":1610540,"EM PRODUÇÃO":14699701,"FATURADOS":31350652},
+  grupoQtd:{"PRÉ PRODUÇÃO":7407,"FINANCEIRO":1180,"EM PRODUÇÃO":17193,"FATURADOS":31471},
+  subgrupos:{"TIRZEPATIDA":73603115,"DEMAIS SECOS INJETÁVEIS":10299445,"PELLETS":4146466,"VITAMINA INJETÁVEIS":3746027,"HORMÔNIOS INJETÁVEIS":2481086,"FRACIONADO":1821656,"INTRADERMO":147858,"DEMAIS GELADOS INJETÁVEIS":33718},
+  transportadoras:{"SEDEX CORREIOS":64984,"MOTOBOY":7993,"AZUL AEREAS":5956,"GOL LINHAS AREA":2721,"MOTO ESPORADICO":2505},
+  vendors:{"ROSEMARY STANIZE":7668637,"CARLA RUTH PEREIRA LIMA":6795175,"FRANCILDA ALVES GARCIA":3721368,"GLEICIANNE RODRIGUES FERREIRA":2583520,"JULIANA CASSIA":2537085,"REGIANE DOMINGUES":2516266,"LUIS FILIPE CALDARELLI":2206806,"ANANDA SILVA DE MELO BARRETO":2091860,"CLAUDIA GONÇALVES":2080113,"JOÃO CARLOS ALMEIDA":2015889},
+  marStatusQtd:{"Pedido Entregue":8200,"Em Malote":5100,"Aguardando Montagem dos Volume":2800,"Aguardando Pagamento":350,"Em Manipulacao":800,"Pedido de Vendas Faturado":1200,"Pedido em Transporte":550},
+  aprStatusQtd:{"Pedido Entregue":16800,"Em Malote":9691,"Aguardando Montagem dos Volume":3030,"Aguardando Pagamento":705,"Em Manipulacao":1594,"Pedido de Vendas Faturado":2699,"Pedido em Transporte":1143},
+  alertVendors:{"ROSEMARY STANIZE":42,"CARLA RUTH PEREIRA LIMA":38,"FRANCILDA ALVES GARCIA":31,"GLEICIANNE RODRIGUES FERREIRA":28,"JULIANA CASSIA":24,"REGIANE DOMINGUES":19,"LUIS FILIPE CALDARELLI":17,"ANANDA SILVA DE MELO BARRETO":15},
+  kpis:{total:67088505,pedidos:13041,clientes:6861,ticket:5144,criticos:6734},
+  cancelVal:3606180,cancelQtd:5860,bloqVal:555193,bloqQtd:67,pagVal:1610540,pagQtd:1180,reprovVal:1202512,reprovQtd:874
+};
+
+// ─── CHART DEFAULTS ───────────────────────────────────────────────────────────
+Chart.defaults.font.family = "'Nunito Sans', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#8892a4';
+
+const CD = {
+  responsive:true, maintainAspectRatio:false, animation:{duration:700},
+  plugins:{legend:{display:false}, tooltip:{backgroundColor:'#1e2235',titleColor:'#e2e8f0',bodyColor:'#8892a4',borderColor:'#2e3250',borderWidth:1,padding:10}},
+  scales:{
+    x:{grid:{color:'rgba(30,34,53,0.8)'},ticks:{color:'#5a6480',font:{size:10},maxRotation:45}},
+    y:{grid:{color:'rgba(30,34,53,0.8)'},ticks:{color:'#5a6480',font:{size:10},callback:v=>fmt(v)}}
+  }
+};
+function mkChart(id,type,data,opts){
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id),{type,data,options:{...CD,...opts}});
+  return charts[id];
+}
+
+// ─── RENDER OVERVIEW ─────────────────────────────────────────────────────────
+function renderOverview(d=BUILTIN){
+  // KPIs
+  document.getElementById('kpiFat').textContent = fmt(d.kpis.total);
+  document.getElementById('kpiPed').textContent = num(d.kpis.pedidos);
+  document.getElementById('kpiCli').textContent = num(d.kpis.clientes);
+  document.getElementById('kpiTicket').textContent = fmt(d.kpis.ticket);
+  document.getElementById('kpiCrit').textContent = num(d.kpis.criticos);
+  document.getElementById('alertBadge').textContent = d.kpis.criticos;
+
+  // Alerts bar
+  const ab = document.getElementById('alertsBar');
+  ab.innerHTML = `
+    <div class="alert red"><span class="alert-icon">✕</span><span><b>${num(d.cancelQtd)}</b> pedidos cancelados</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">${fmt(d.cancelVal)}</span></div>
+    <div class="alert orange"><span class="alert-icon">⬡</span><span><b>${num(d.bloqQtd)}</b> bloqueados por estoque</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">${fmt(d.bloqVal)}</span></div>
+    <div class="alert yellow"><span class="alert-icon">◌</span><span><b>${num(d.pagQtd)}</b> aguardando pagamento</span><span style="margin-left:auto;font-family:var(--font-mono);font-size:0.8rem">${fmt(d.pagVal)}</span></div>`;
+
+  renderDailyChart('all', d);
+
+  // Status donut — only valid statuses from STATUS_MAP, colored by grupo
+  const skAll = Object.keys(d.statusVal), svAll = Object.values(d.statusVal);
+  const skColors = skAll.map(k => STATUS_MAP[k] ? GRUPO_COLORS[STATUS_MAP[k].grupo] : '#5a6480');
+  const st = svAll.reduce((a,b)=>a+b,0);
+  mkChart('chartStatusDonut','doughnut',{labels:skAll,datasets:[{data:svAll,backgroundColor:skColors,borderWidth:2,borderColor:'#12141e'}]},{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const g=STATUS_MAP[skAll[c.dataIndex]]?.grupo||''; return ` ${fmt(c.parsed)} (${(c.parsed/st*100).toFixed(1)}%) · ${g}`; }}}}});
+  const leg = document.getElementById('statusLegend');
+  leg.innerHTML = skAll.map((k,i)=>{
+    const g=STATUS_MAP[k]; const color=g?GRUPO_COLORS[g.grupo]:'#5a6480';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.7rem"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>${k}</span><span style="font-family:var(--font-mono);color:var(--muted)">${(svAll[i]/st*100).toFixed(1)}%</span></div>`;
+  }).join('');
+
+  // Grupo de Pedidos bar chart
+  if(d.grupoVal){
+    const gk=Object.keys(d.grupoVal), gv=Object.values(d.grupoVal), gc=gk.map(k=>GRUPO_COLORS[k]);
+    mkChart('chartGrupoBar','bar',{labels:gk,datasets:[{data:gv,backgroundColor:gc,borderRadius:5,borderWidth:0}]},{scales:{x:{grid:{display:false},ticks:{color:'#5a6480',font:{size:9}}},y:{display:false}},plugins:{...CD.plugins,tooltip:{...CD.plugins.tooltip,callbacks:{label:c=>` ${fmt(c.parsed.y)}`}}}});
+    const gtot=gv.reduce((a,b)=>a+b,0);
+    const gl=document.getElementById('grupoLegend');
+    if(gl) gl.innerHTML=gk.map((k,i)=>`<div style="background:${GRUPO_COLORS_DIM[k]};border:1px solid ${GRUPO_COLORS[k]}33;border-radius:7px;padding:8px 10px"><div style="font-size:0.62rem;color:${GRUPO_COLORS[k]};font-family:var(--font-mono);font-weight:700;margin-bottom:3px">${k}</div><div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#fff">${fmt(gv[i])}</div><div style="font-size:0.62rem;color:var(--muted);margin-top:2px">${d.grupoQtd?num(d.grupoQtd[k])+' ped.':''} · ${(gv[i]/gtot*100).toFixed(1)}%</div></div>`).join('');
+  }
+
+  // Subgrupos
+  const sgk=Object.keys(d.subgrupos),sgv=Object.values(d.subgrupos);
+  mkChart('chartSubgrupo','bar',{labels:sgk.map(k=>k.length>18?k.slice(0,16)+'…':k),datasets:[{data:sgv,backgroundColor:PALETTE,borderRadius:4,borderWidth:0}]},{indexAxis:'y',scales:{x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,callback:v=>fmt(v)}},y:{grid:{display:false},ticks:{color:'#5a6480',font:{size:9}}}}});
+
+  // Transportadoras
+  const trk=Object.keys(d.transportadoras),trv=Object.values(d.transportadoras),trt=trv.reduce((a,b)=>a+b,0);
+  mkChart('chartTransp','doughnut',{labels:trk,datasets:[{data:trv,backgroundColor:PALETTE,borderWidth:2,borderColor:'#12141e'}]},{cutout:'58%',plugins:{legend:{display:true,position:'bottom',labels:{color:'#5a6480',font:{size:9},boxWidth:8,padding:6}},tooltip:{callbacks:{label:c=>` ${c.label}: ${num(c.parsed)} (${(c.parsed/trt*100).toFixed(1)}%)`}}}});
+
+  // Status qtd
+  const qqk=Object.keys(d.statusQtd),qqv=Object.values(d.statusQtd);
+  mkChart('chartStatusQtd','bar',{labels:qqk.map(k=>k.length>18?k.slice(0,16)+'…':k),datasets:[{data:qqv,backgroundColor:PALETTE,borderRadius:4,borderWidth:0}]},{indexAxis:'y',scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:10}}},y:{grid:{display:false},ticks:{color:'#5a6480',font:{size:9}}}},plugins:{...CD.plugins,tooltip:{...CD.plugins.tooltip,callbacks:{label:c=>` ${num(c.parsed.x)} pedidos`}}}});
+}
+
+function renderDailyChart(mode, d=BUILTIN){
+  const ml=[],mv=[],al=[],av=[];
+  for(let i=1;i<=31;i++){ml.push(i+'/03');mv.push(d.marchDaily[i]||0);}
+  for(let i=1;i<=30;i++){al.push(i+'/04');av.push(d.aprilDaily[i]||0);}
+  let labels,datasets;
+  if(mode==='mar'){labels=ml;datasets=[{label:'Março',data:mv,backgroundColor:'rgba(79,142,247,0.75)',borderColor:'#4f8ef7',borderWidth:1,borderRadius:3}];}
+  else if(mode==='abr'){labels=al;datasets=[{label:'Abril',data:av,backgroundColor:'rgba(34,197,94,0.75)',borderColor:'#22c55e',borderWidth:1,borderRadius:3}];}
+  else{labels=[...ml,...al];datasets=[{label:'Março',data:[...mv,...Array(30).fill(0)],backgroundColor:'rgba(79,142,247,0.7)',borderColor:'#4f8ef7',borderWidth:1,borderRadius:2},{label:'Abril',data:[...Array(31).fill(0),...av],backgroundColor:'rgba(34,197,94,0.7)',borderColor:'#22c55e',borderWidth:1,borderRadius:2}];}
+  mkChart('chartDaily','bar',{labels,datasets},{plugins:{...CD.plugins,legend:{display:true,labels:{color:'#8892a4',font:{size:10},boxWidth:10}}}});
+}
+
+let _dailyMode='all';
+function switchDaily(mode,btn){
+  _dailyMode=mode;
+  document.querySelectorAll('#section-overview .tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  renderDailyChart(mode);
+}
+
+// ─── RENDER COMPARISON ────────────────────────────────────────────────────────
+function renderComparison(d=BUILTIN){
+  const marT=Object.values(d.marchDaily).reduce((a,b)=>a+b,0);
+  const aprT=Object.values(d.aprilDaily).reduce((a,b)=>a+b,0);
+  document.getElementById('marTotal').textContent=fmt(marT);
+  document.getElementById('aprTotal').textContent=fmt(aprT);
+
+  // Mar kpis
+  document.getElementById('marKpis').innerHTML=`
+    <div class="comp-kpi"><div class="comp-kpi-label">Faturamento</div><div class="comp-kpi-val" style="color:var(--blue)">${fmt(marT)}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Dias ativos</div><div class="comp-kpi-val">${Object.values(d.marchDaily).filter(v=>v>0).length}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Maior dia</div><div class="comp-kpi-val" style="font-size:0.85rem">${fmt(Math.max(...Object.values(d.marchDaily)))}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Média/dia</div><div class="comp-kpi-val" style="font-size:0.85rem">${fmt(marT/Object.values(d.marchDaily).filter(v=>v>0).length)}</div></div>`;
+  document.getElementById('aprKpis').innerHTML=`
+    <div class="comp-kpi"><div class="comp-kpi-label">Faturamento</div><div class="comp-kpi-val" style="color:var(--green)">${fmt(aprT)}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Dias ativos</div><div class="comp-kpi-val">${Object.values(d.aprilDaily).filter(v=>v>0).length}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Maior dia</div><div class="comp-kpi-val" style="font-size:0.85rem">${fmt(Math.max(...Object.values(d.aprilDaily)))}</div></div>
+    <div class="comp-kpi"><div class="comp-kpi-label">Crescimento</div><div class="comp-kpi-val" style="color:var(--green);font-size:0.85rem">+${((aprT/marT-1)*100).toFixed(0)}%</div></div>`;
+
+  // Mini charts
+  const marKeys=Object.keys(d.marchDaily).map(Number).sort((a,b)=>a-b);
+  mkChart('chartMar','line',{labels:marKeys.map(k=>k+'/03'),datasets:[{data:marKeys.map(k=>d.marchDaily[k]),borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,0.1)',fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},{scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:8}}},y:{...CD.scales.y,ticks:{color:'#5a6480',font:{size:8},callback:v=>fmt(v)}}}});
+  const aprKeys=Object.keys(d.aprilDaily).map(Number).sort((a,b)=>a-b);
+  mkChart('chartApr','line',{labels:aprKeys.map(k=>k+'/04'),datasets:[{data:aprKeys.map(k=>d.aprilDaily[k]),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.1)',fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},{scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:8}}},y:{...CD.scales.y,ticks:{color:'#5a6480',font:{size:8},callback:v=>fmt(v)}}}});
+
+  // Side by side
+  const days=Array.from({length:31},(_,i)=>i+1);
+  mkChart('chartCompare','bar',{labels:days.map(d=>d+'º'),datasets:[
+    {label:'Março',data:days.map(d=>BUILTIN.marchDaily[d]||0),backgroundColor:'rgba(79,142,247,0.75)',borderRadius:3,borderWidth:0},
+    {label:'Abril',data:days.map(d=>BUILTIN.aprilDaily[d]||0),backgroundColor:'rgba(34,197,94,0.75)',borderRadius:3,borderWidth:0}
+  ]},{plugins:{...CD.plugins,legend:{display:true,labels:{color:'#8892a4',font:{size:10},boxWidth:10}}}});
+
+  // Status comparison
+  const allSt=[...new Set([...Object.keys(d.marStatusQtd),...Object.keys(d.aprStatusQtd)])];
+  mkChart('chartStatusComp','bar',{labels:allSt.map(s=>s.length>20?s.slice(0,18)+'…':s),datasets:[
+    {label:'Março',data:allSt.map(s=>d.marStatusQtd[s]||0),backgroundColor:'rgba(79,142,247,0.75)',borderRadius:3,borderWidth:0},
+    {label:'Abril',data:allSt.map(s=>d.aprStatusQtd[s]||0),backgroundColor:'rgba(34,197,94,0.75)',borderRadius:3,borderWidth:0}
+  ]},{plugins:{...CD.plugins,legend:{display:true,labels:{color:'#8892a4',font:{size:10},boxWidth:10}}},scales:{x:{...CD.scales.x},y:{...CD.scales.y}},plugins2:{tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${num(c.parsed.y)}`}}}});
+}
+
+// ─── RENDER VENDORS ───────────────────────────────────────────────────────────
+function renderVendors(d=BUILTIN){
+  const vk=Object.keys(d.vendors).slice(0,10), vv=Object.values(d.vendors).slice(0,10);
+  mkChart('chartVendors','bar',{labels:vk.map(n=>n.split(' ')[0]),datasets:[{data:vv,backgroundColor:PALETTE,borderRadius:5,borderWidth:0}]},{scales:{x:{...CD.scales.x},y:{...CD.scales.y}}});
+  const maxV=Math.max(...vv), tot=Object.values(d.vendors).reduce((a,b)=>a+b,0);
+  const tb=document.getElementById('vendorTable');
+  tb.innerHTML=`<thead><tr><th>#</th><th>Vendedor</th><th>Faturamento</th><th style="width:38%">Participação</th></tr></thead><tbody>${vk.map((name,i)=>`<tr><td><span class="rank-badge ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i+1}</span></td><td style="font-weight:600;color:var(--text)">${name}</td><td style="font-family:var(--font-mono);color:var(--blue2)">${fmtFull(vv[i])}</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${(vv[i]/maxV*100).toFixed(0)}%;background:${PALETTE[i]}"></div></div><span class="pct-text">${(vv[i]/tot*100).toFixed(1)}%</span></div></td></tr>`).join('')}</tbody>`;
+}
+
+// ─── RENDER ALERTS ────────────────────────────────────────────────────────────
+function renderAlerts(d=BUILTIN){
+  document.getElementById('cancelVal').textContent=fmt(d.cancelVal);
+  document.getElementById('cancelQtd').textContent=`${num(d.cancelQtd)} pedidos cancelados`;
+  document.getElementById('bloqVal').textContent=fmt(d.bloqVal);
+  document.getElementById('bloqQtd').textContent=`${num(d.bloqQtd)} pedidos bloqueados`;
+  document.getElementById('pagVal').textContent=fmt(d.pagVal);
+  document.getElementById('pagQtd').textContent=`${num(d.pagQtd)} pedidos aguardando`;
+  document.getElementById('reprovVal').textContent=fmt(d.reprovVal);
+  document.getElementById('reprovQtd').textContent=`${num(d.reprovQtd)} pedidos reprovados`;
+  const avk=Object.keys(d.alertVendors),avv=Object.values(d.alertVendors);
+  mkChart('chartAlertVendor','bar',{labels:avk.map(n=>n.split(' ')[0]),datasets:[{data:avv,backgroundColor:'rgba(239,68,68,0.7)',borderColor:'var(--red)',borderWidth:1,borderRadius:4}]},{scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>v+' ped.'}}}});
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+const pageTitles={overview:['Visão Geral','Mar–Abr 2026 · 84.248 registros'],comparison:['Mar vs Abr · Comparativo','Análise lado a lado dos dois períodos'],
+    products:['Produtos Mais Vendidos','Análise por grupo GELADO / SECO por dia'],vendors:['Ranking de Vendedores','Performance individual por vendedor'],alerts:['Central de Alertas','Pedidos críticos que precisam de atenção'],
+    carteira:['Carteira','VENDAS · Visão da carteira de pedidos']};
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  const [t,s]=pageTitles[id];
+  document.getElementById('pageTitle').textContent=t;
+  document.getElementById('pageSub').textContent=s;
+  if(id==='comparison') renderComparison();
+  if(id==='vendors') renderVendors();
+  if(id==='alerts') renderAlerts();
+}
+
+// ─── FILTERS ──────────────────────────────────────────────────────────────────
+function applyFilters(){
+  const period=document.getElementById('filterPeriod').value;
+  const status=document.getElementById('filterStatus').value;
+  const vendor=document.getElementById('filterVendor').value;
+  const subgrupo=document.getElementById('filterSubgrupo').value;
+  const active=[period!=='all',status!=='all',vendor!=='all',subgrupo!=='all'].filter(Boolean).length;
+  document.getElementById('filterCount').textContent=active>0?`${active} filtro(s) ativo(s)`:'';
+  if(RAW.length===0){alert('Carregue uma planilha para usar filtros dinâmicos.');return;}
+  // dynamic filtering if data loaded
+}
+function clearFilters(){
+  ['filterPeriod','filterStatus','filterVendor','filterSubgrupo'].forEach(id=>{document.getElementById(id).value='all';});
+  document.getElementById('filterCount').textContent='';
+}
+
+// ─── FILE UPLOAD & PARSE ─────────────────────────────────────────────────────
+function handleFile(e){
+  const file=e.target.files[0]; if(!file) return;
+  showLoading('Lendo arquivo '+file.name+'...');
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      document.getElementById('loadingText').textContent='Identificando aba...';
+      // Try sheet index 3 (4th sheet) or named sheet
+      const sheetName=wb.SheetNames[3]||wb.SheetNames[0];
+      document.getElementById('loadingText').textContent='Processando '+sheetName+'...';
+      const ws=wb.Sheets[sheetName];
+      const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      document.getElementById('loadingText').textContent='Calculando métricas...';
+      setTimeout(()=>{parseData(json,file.name,sheetName);},100);
+    } catch(err){hideLoading();alert('Erro ao ler arquivo: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseData(json, filename, sheetName){
+  // Find header row
+  let headerRow=1, headers=[];
+  for(let i=0;i<Math.min(5,json.length);i++){
+    if(json[i].includes('Status')||json[i].includes('Vendedor')){headerRow=i;headers=json[i];break;}
+  }
+  if(!headers.length){hideLoading();alert('Não encontrei cabeçalho válido. Verifique se a aba correta tem colunas como Status, Vendedor, Total.');return;}
+  
+  const idx={};
+  headers.forEach((h,i)=>{if(h) idx[String(h).trim()]=i;});
+  const data=json.slice(headerRow+1).filter(r=>r.some(c=>c!==''));
+
+  const totalCol=idx['Total']??10;
+  const statusCol=idx['Status']??5;
+  const vendorCol=idx['Vendedor']??1;
+  const sgCol=idx['Sub Grupo']??20;
+  const trCol=idx['Transportadora']??13;
+  const fatCol=idx['Data de Faturamento']??18;
+  const vendaCol=idx['Data Venda']??4;   // coluna E — usada para gráficos diários
+  const pedCol=idx['Pedido']??2;
+  const cliCol=idx['Cliente']??16;
+
+  const marchD={}, aprilD={}, statusVal={}, statusQtd={}, vendors={}, subgrupos={}, transpCount={};
+  const marStatusQtd={}, aprStatusQtd={};
+  let totalFat=0, pedSet=new Set(), cliSet=new Set();
+  let cancelVal=0,cancelQtd=0,bloqVal=0,bloqQtd=0,pagVal=0,pagQtd=0,reprovVal=0,reprovQtd=0;
+  const alertVendors={};
+
+  data.forEach(r=>{
+    const tot=parseFloat(r[totalCol])||0;
+    const st=String(r[statusCol]||'').trim();
+    const fat=String(r[fatCol]||'').trim();
+    const vend=String(r[vendorCol]||'').trim();
+    const sg=String(r[sgCol]||'').trim();
+    const tr=String(r[trCol]||'').trim();
+    const ped=String(r[pedCol]||'').trim();
+    const cli=String(r[cliCol]||'').trim();
+
+    // Data Venda (coluna E) — base para gráficos diários
+    const vendaRaw=r[vendaCol];
+    let venda='';
+    if(vendaRaw){
+      // Suporta formato JS Date serial (número), string DD/MM/YYYY, ou objeto Date
+      if(typeof vendaRaw==='number'){
+        const d=new Date(Math.round((vendaRaw-25569)*86400*1000));
+        const dd=String(d.getUTCDate()).padStart(2,'0');
+        const mm=String(d.getUTCMonth()+1).padStart(2,'0');
+        const yy=d.getUTCFullYear();
+        venda=`${dd}/${mm}/${yy}`;
+      } else {
+        venda=String(vendaRaw).trim();
+      }
+    }
+
+    if(tot>0) totalFat+=tot;
+    if(ped) pedSet.add(ped);
+    if(cli) cliSet.add(cli);
+
+    // Daily — baseado em Data Venda
+    if(venda && tot>0){
+      const parts=venda.split('/');
+      if(parts.length===3){
+        const day=parseInt(parts[0]),mon=parts[1];
+        if(mon==='03') marchD[day]=(marchD[day]||0)+tot;
+        else if(mon==='04') aprilD[day]=(aprilD[day]||0)+tot;
+      }
+    }
+    // Status
+    if(st){
+      statusQtd[st]=(statusQtd[st]||0)+1;
+      if(tot>0) statusVal[st]=(statusVal[st]||0)+tot;
+      if(venda){const parts=venda.split('/');if(parts.length===3){const mon=parts[1];if(mon==='03') marStatusQtd[st]=(marStatusQtd[st]||0)+1;else if(mon==='04') aprStatusQtd[st]=(aprStatusQtd[st]||0)+1;}}
+    }
+    // Vendor
+    if(vend && tot>0) vendors[vend]=(vendors[vend]||0)+tot;
+    // Subgrupo
+    if(sg && tot>0) subgrupos[sg]=(subgrupos[sg]||0)+tot;
+    // Transportadora
+    if(tr) transpCount[tr]=(transpCount[tr]||0)+1;
+    // Alerts — baseado no STATUS_MAP e GRUPO PEDIDO
+    const stLow=st.toLowerCase();
+    const grupo=STATUS_MAP[st]?.grupo||'';
+    // Cancelados: detecção por nome
+    if(stLow.includes('cancelado')){cancelVal+=tot;cancelQtd++;}
+    // Bloqueados por estoque: detecção por nome
+    if(stLow.includes('bloqueado')){bloqVal+=tot;bloqQtd++;}
+    // Aguardando Pagamento: todos os status do grupo FINANCEIRO (A2)
+    if(grupo==='FINANCEIRO'){pagVal+=tot;pagQtd++;}
+    // Reprovados: detecção por nome
+    if(stLow.includes('reprovado')){reprovVal+=tot;reprovQtd++;}
+    if((stLow.includes('cancelado')||stLow.includes('bloqueado')||stLow.includes('reprovado'))&&vend){
+      alertVendors[vend]=(alertVendors[vend]||0)+1;
+    }
+  });
+
+  // Calculate grupo totals from STATUS_MAP
+  const grupoVal={'PRÉ PRODUÇÃO':0,'FINANCEIRO':0,'EM PRODUÇÃO':0,'FATURADOS':0};
+  const grupoQtd={'PRÉ PRODUÇÃO':0,'FINANCEIRO':0,'EM PRODUÇÃO':0,'FATURADOS':0};
+  Object.entries(statusVal).forEach(([st,v])=>{const m=STATUS_MAP[st];if(m&&grupoVal[m.grupo]!==undefined){grupoVal[m.grupo]+=v;}});
+  Object.entries(statusQtd).forEach(([st,q])=>{const m=STATUS_MAP[st];if(m&&grupoQtd[m.grupo]!==undefined){grupoQtd[m.grupo]+=q;}});
+  // Filter statusVal/statusQtd to only valid statuses
+  const filteredStatusVal=Object.fromEntries(Object.entries(statusVal).filter(([k])=>STATUS_MAP[k]));
+  const filteredStatusQtd=Object.fromEntries(Object.entries(statusQtd).filter(([k])=>STATUS_MAP[k]));
+  const topVendors=Object.fromEntries(Object.entries(vendors).sort((a,b)=>b[1]-a[1]).slice(0,10));
+  const topAlerts=Object.fromEntries(Object.entries(alertVendors).sort((a,b)=>b[1]-a[1]).slice(0,8));
+  const ticket=pedSet.size>0?totalFat/pedSet.size:0;
+  const criticos=cancelQtd+bloqQtd+reprovQtd;
+
+  const newData={
+    marchDaily:marchD, aprilDaily:aprilD,
+    statusVal:Object.fromEntries(Object.entries(filteredStatusVal||statusVal).sort((a,b)=>b[1]-a[1]).slice(0,14)),
+    statusQtd:Object.fromEntries(Object.entries(filteredStatusQtd||statusQtd).sort((a,b)=>b[1]-a[1]).slice(0,14)),
+    grupoVal, grupoQtd,
+    subgrupos:Object.fromEntries(Object.entries(subgrupos).sort((a,b)=>b[1]-a[1]).slice(0,8)),
+    transportadoras:Object.fromEntries(Object.entries(transpCount).sort((a,b)=>b[1]-a[1]).slice(0,8)),
+    vendors:topVendors, marStatusQtd, aprStatusQtd,
+    alertVendors:topAlerts,
+    kpis:{total:totalFat,pedidos:pedSet.size,clientes:cliSet.size,ticket:Math.round(ticket),criticos},
+    cancelVal,cancelQtd,bloqVal,bloqQtd,pagVal,pagQtd,reprovVal,reprovQtd
+  };
+
+  document.getElementById('fileInfo').textContent=`${filename} · ${sheetName}`;
+  document.getElementById('pageSub').textContent=`${sheetName} · ${num(data.length)} registros`;
+  document.getElementById('alertBadge').textContent=criticos;
+
+  // Populate filter dropdowns
+  const statusSel=document.getElementById('filterStatus');
+  const validStatuses=Object.keys(statusQtd).filter(s=>STATUS_MAP[s]);
+  statusSel.innerHTML='<option value="all">Todos os status</option>'+['PRÉ PRODUÇÃO','FINANCEIRO','EM PRODUÇÃO','FATURADOS'].map(g=>`<optgroup label="── ${g} ──">${validStatuses.filter(s=>STATUS_MAP[s]?.grupo===g).map(s=>`<option value="${s}">${s} (${STATUS_MAP[s].ordem})</option>`).join('')}</optgroup>`).join('');
+  const vendSel=document.getElementById('filterVendor');
+  vendSel.innerHTML='<option value="all">Todos os vendedores</option>'+Object.keys(topVendors).map(v=>`<option value="${v}">${v}</option>`).join('');
+  const sgSel=document.getElementById('filterSubgrupo');
+  sgSel.innerHTML='<option value="all">Todos os subgrupos</option>'+Object.keys(subgrupos).map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  hideLoading();
+  showSection('overview');
+  renderOverview(newData);
+  // Store for other sections
+  window._currentData=newData;
+  const origComp=renderComparison, origVend=renderVendors, origAl=renderAlerts;
+  window._compData=newData; window._vendData=newData; window._alData=newData;
+}
+
+// ─── LOADING ──────────────────────────────────────────────────────────────────
+function showLoading(msg){const el=document.getElementById('loading');el.classList.add('show');document.getElementById('loadingText').textContent=msg||'Processando...';}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+
+// ─── PDF EXPORT ───────────────────────────────────────────────────────────────
+function exportPDF(){
+  const btn=document.querySelector('.btn.primary');
+  btn.textContent='⟳ Gerando...';
+  setTimeout(()=>{
+    window.print();
+    btn.textContent='⬇ Exportar PDF';
+  },300);
+}
+
+// ─── DRAG AND DROP ────────────────────────────────────────────────────────────
+document.addEventListener('dragover',e=>{e.preventDefault();});
+document.addEventListener('drop',e=>{
+  e.preventDefault();
+  const file=e.dataTransfer.files[0];
+  if(file&&(file.name.endsWith('.xlsx')||file.name.endsWith('.xls'))){
+    const dt=new DataTransfer();dt.items.add(file);
+    document.getElementById('fileInput').files=dt.files;
+    handleFile({target:{files:[file]}});
+  }
+});
+
+// ─── SELF DOWNLOAD ────────────────────────────────────────────────────────────
+function downloadApp(){
+  const html = document.documentElement.outerHTML;
+  const blob = new Blob(['<!DOCTYPE html>\n' + html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'FBX_Dashboard_v2.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
+
+let _prodGrupo='GELADO', _prodPeriod='mar', _prodView='val', _prodDay=null, _prodSelected=null;
+const PROD_PALETTE_GELADO=['#06b6d4','#0891b2','#22d3ee','#67e8f9','#a5f3fc','#0e7490'];
+const PROD_PALETTE_SECO=['#f97316','#fb923c','#a855f7','#c084fc','#4f8ef7','#22c55e','#eab308','#ec4899'];
+
+function setGrupo(g){
+  _prodGrupo=g;
+  const iG=g==='GELADO';
+  document.getElementById('btnGelado').style.cssText=iG?'padding:8px 22px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:2px solid #06b6d4;background:rgba(6,182,212,0.2);color:#06b6d4':'padding:8px 22px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:2px solid var(--border2);background:transparent;color:var(--muted2)';
+  document.getElementById('btnSeco').style.cssText=!iG?'padding:8px 22px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:2px solid #f97316;background:rgba(249,115,22,0.2);color:#f97316':'padding:8px 22px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:var(--font-body);border:2px solid var(--border2);background:transparent;color:var(--muted2)';
+  renderProducts();
+}
+function setProdPeriod(p){
+  _prodPeriod=p;
+  document.getElementById('btnProdMar').style.cssText=p==='mar'?'padding:6px 14px;border-radius:7px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(79,142,247,0.4);background:rgba(79,142,247,0.15);color:var(--blue2)':'padding:6px 14px;border-radius:7px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid var(--border2);background:transparent;color:var(--muted2)';
+  document.getElementById('btnProdAbr').style.cssText=p==='abr'?'padding:6px 14px;border-radius:7px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.15);color:#4ade80':'padding:6px 14px;border-radius:7px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid var(--border2);background:transparent;color:var(--muted2)';
+  renderProducts();
+}
+function setProdView(v){
+  _prodView=v;
+  document.getElementById('btnViewVal').style.cssText=v==='val'?'padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(79,142,247,0.4);background:rgba(79,142,247,0.15);color:var(--blue2)':'padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid var(--border2);background:transparent;color:var(--muted2)';
+  document.getElementById('btnViewQtd').style.cssText=v==='qtd'?'padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.15);color:#4ade80':'padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:1px solid var(--border2);background:transparent;color:var(--muted2)';
+  renderProducts();
+}
+
+function buildDatePills(){
+  const isMar=_prodPeriod==='mar';
+  const src=window._currentData?.products||PRODUCTS;
+  const prods=src[_prodGrupo.toLowerCase()]||[];
+  // collect days that have any data
+  const daysWithData=new Set();
+  prods.forEach(p=>{
+    const daily=isMar?p.daily_mar:p.daily_apr;
+    Object.keys(daily||{}).forEach(d=>{ if((daily[d]||0)>0) daysWithData.add(parseInt(d)); });
+  });
+  const days=[...daysWithData].sort((a,b)=>a-b);
+  const mon=isMar?'03':'04';
+  const wrap=document.getElementById('datePillsWrap');
+  wrap.innerHTML=days.map(d=>`
+    <button onclick="setDayFilter(${d})" id="dpill_${d}"
+      style="padding:4px 10px;border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;
+             font-family:var(--font-mono);border:1px solid var(--border2);background:transparent;
+             color:var(--muted2);transition:all .15s;min-width:46px"
+      onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue2)'"
+      onmouseout="if(_prodDay!=${d}){this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'}"
+    >${d}/${mon}</button>`).join('');
+}
+
+function setDayFilter(day){
+  _prodDay = (_prodDay===day) ? null : day; // toggle
+  // Update pill styles
+  document.querySelectorAll('[id^="dpill_"]').forEach(el=>{
+    const d=parseInt(el.id.replace('dpill_',''));
+    if(d===_prodDay){
+      el.style.cssText=el.style.cssText+';border:1px solid var(--blue)!important;background:rgba(79,142,247,0.2)!important;color:var(--blue2)!important';
+      el.style.borderColor='var(--blue)'; el.style.background='rgba(79,142,247,0.2)'; el.style.color='var(--blue2)';
+    } else {
+      el.style.borderColor='var(--border2)'; el.style.background='transparent'; el.style.color='var(--muted2)';
+    }
+  });
+  const btn=document.getElementById('btnClearDate');
+  const lbl=document.getElementById('dateFilterLabel');
+  if(_prodDay){
+    btn.style.display='block';
+    const mon=_prodPeriod==='mar'?'03':'04';
+    lbl.textContent=`Mostrando: ${_prodDay}/${mon}`;
+    lbl.style.color='var(--blue2)';
+  } else {
+    btn.style.display='none';
+    lbl.textContent='';
+  }
+  renderProducts();
+}
+
+function clearDateFilter(){
+  _prodDay=null;
+  document.querySelectorAll('[id^="dpill_"]').forEach(el=>{
+    el.style.borderColor='var(--border2)'; el.style.background='transparent'; el.style.color='var(--muted2)';
+  });
+  document.getElementById('btnClearDate').style.display='none';
+  document.getElementById('dateFilterLabel').textContent='';
+  renderProducts();
+}
+
+function selectProduct(name){
+  _prodSelected = (_prodSelected===name) ? null : name;
+  renderProducts();
+}
+
+
+function renderProducts(data){
+  const src=data||(window._currentData?.products)||PRODUCTS;
+  const prods=src[_prodGrupo.toLowerCase()];
+  if(!prods||!prods.length) return;
+  const isGelado=_prodGrupo==='GELADO';
+  const isMar=_prodPeriod==='mar';
+  const isVal=_prodView==='val';
+  const palette=isGelado?PROD_PALETTE_GELADO:PROD_PALETTE_SECO;
+  const periodLabel=isMar?'Março 2026':'Abril 2026';
+  const days=isMar?Array.from({length:31},(_,i)=>i+1):Array.from({length:30},(_,i)=>i+1);
+  const dayLabels=days.map(d=>d+(isMar?'/03':'/04'));
+
+  document.getElementById('prodGroupLabel').textContent=`${_prodGrupo} · ${periodLabel} · ${isVal?'Faturamento':'Qtd A1+A3'}`;
+  buildDatePills();
+  // reset day if not in period
+  if(_prodDay){
+    const dip=new Set(); prods.forEach(p=>{const dl=isMar?p.daily_mar:p.daily_apr; Object.keys(dl||{}).forEach(d=>{if((dl[d]||0)>0)dip.add(parseInt(d));});});
+    if(!dip.has(_prodDay)){_prodDay=null;const b=document.getElementById('btnClearDate');if(b)b.style.display='none';const l=document.getElementById('dateFilterLabel');if(l)l.textContent='';}
+    else{
+      // re-highlight active pill
+      setTimeout(()=>{const el=document.getElementById('dpill_'+_prodDay);if(el){el.style.borderColor='var(--blue)';el.style.background='rgba(79,142,247,0.2)';el.style.color='var(--blue2)';}},50);
+    }
+  }
+  document.getElementById('prodChartTitle').textContent=`${isVal?'Faturamento Diário':'Quantidade Diária (A1+A3)'} — ${_prodGrupo} · ${periodLabel}`;
+  document.getElementById('prodRankTitle').textContent=`Ranking — ${_prodGrupo} · ${periodLabel}`;
+
+  // Period values
+  const getPeriodVal=(p)=>isVal?(isMar?Object.values(p.daily_mar||{}).reduce((a,b)=>a+b,0):Object.values(p.daily_apr||{}).reduce((a,b)=>a+b,0)):(isMar?(p.qtd_a1a3_mar||0):(p.qtd_a1a3_abr||0));
+  const getDayData=(p,d)=>isVal?(isMar?p.daily_mar?.[d]||0:p.daily_apr?.[d]||0):(isMar?p.daily_qtd_mar?.[d]||0:p.daily_qtd_abr?.[d]||0);
+
+  const totalVal=prods.reduce((a,p)=>a+(isMar?Object.values(p.daily_mar||{}).reduce((x,y)=>x+y,0):Object.values(p.daily_apr||{}).reduce((x,y)=>x+y,0)),0);
+  const totalQtd=prods.reduce((a,p)=>a+(isMar?p.qtd_a1a3_mar||0:p.qtd_a1a3_abr||0),0);
+  const topProd=prods[0];
+  const topVal=getPeriodVal(topProd);
+
+  // KPI cards
+  document.getElementById('prodKpis').innerHTML=`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;border-top:2px solid ${isGelado?'#06b6d4':'#f97316'}">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:6px">Faturamento ${_prodGrupo}</div>
+      <div style="font-family:var(--font-display);font-size:1.4rem;font-weight:800;color:#fff">${fmt(totalVal)}</div>
+      <div style="font-size:0.7rem;color:var(--muted2);margin-top:4px">${periodLabel}</div>
+    </div>
+    <div style="background:var(--card);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:16px;border-top:2px solid var(--green)">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:6px">Qtd Vendida A1+A3</div>
+      <div style="font-family:var(--font-display);font-size:1.4rem;font-weight:800;color:var(--green)">${num(totalQtd)}</div>
+      <div style="font-size:0.7rem;color:var(--muted2);margin-top:4px">peças em produção/pré-prod.</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;border-top:2px solid var(--yellow)">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:6px">Produto Líder</div>
+      <div style="font-family:var(--font-display);font-size:0.85rem;font-weight:800;color:#fff;line-height:1.3">${topProd.name.length>28?topProd.name.slice(0,26)+'…':topProd.name}</div>
+      <div style="font-size:0.68rem;color:var(--yellow);margin-top:4px;font-family:var(--font-mono)">${isVal?fmt(topVal):num(topVal)+' pçs'}</div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;border-top:2px solid var(--purple)">
+      <div style="font-size:0.65rem;color:var(--muted);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:6px">Produtos Ativos</div>
+      <div style="font-family:var(--font-display);font-size:1.4rem;font-weight:800;color:#fff">${prods.length}</div>
+      <div style="font-size:0.7rem;color:var(--muted2);margin-top:4px">SKUs no grupo ${_prodGrupo}</div>
+    </div>
+    ${(()=>{
+      const mon=isMar?'03':'04';
+      if(_prodDay && _prodSelected){
+        const p=prods.find(x=>x.name===_prodSelected||x.cod===_prodSelected);
+        if(p){
+          const dv=isMar?(p.daily_mar?.[_prodDay]||0):(p.daily_apr?.[_prodDay]||0);
+          const dq=isMar?(p.daily_qtd_mar?.[_prodDay]||0):(p.daily_qtd_abr?.[_prodDay]||0);
+          const nm=p.name.length>16?p.name.slice(0,14)+'…':p.name;
+          return '<div style="background:var(--card);border:1px solid rgba(79,142,247,0.45);border-radius:10px;padding:16px;border-top:2px solid var(--blue);position:relative;overflow:hidden">'
+            +'<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,rgba(79,142,247,0.07),transparent);pointer-events:none"></div>'
+            +'<div style="font-size:0.58rem;color:var(--blue2);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:5px;letter-spacing:0.05em">📦 '+_prodDay+'/'+mon+' · '+nm+'</div>'
+            +'<div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;color:#fff;line-height:1">'+num(dq)+'<span style="font-size:0.72rem;color:var(--muted2);font-family:var(--font-body);font-weight:400;margin-left:4px">pçs A1+A3</span></div>'
+            +'<div style="font-size:0.72rem;color:var(--blue2);margin-top:6px;font-family:var(--font-mono);font-weight:600">'+fmt(dv)+'</div>'
+            +'</div>';
+        }
+      }
+      if(_prodDay && !_prodSelected){
+        const dtv=prods.reduce((a,p)=>a+(isMar?(p.daily_mar?.[_prodDay]||0):(p.daily_apr?.[_prodDay]||0)),0);
+        const dtq=prods.reduce((a,p)=>a+(isMar?(p.daily_qtd_mar?.[_prodDay]||0):(p.daily_qtd_abr?.[_prodDay]||0)),0);
+        return '<div style="background:var(--card);border:1px solid rgba(79,142,247,0.35);border-radius:10px;padding:16px;border-top:2px solid var(--blue)">'
+          +'<div style="font-size:0.58rem;color:var(--blue2);font-family:var(--font-mono);text-transform:uppercase;margin-bottom:5px">📅 Total do dia '+_prodDay+'/'+mon+'</div>'
+          +'<div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;color:#fff;line-height:1">'+num(dtq)+'<span style="font-size:0.72rem;color:var(--muted2);font-family:var(--font-body);font-weight:400;margin-left:4px">pçs A1+A3</span></div>'
+          +'<div style="font-size:0.72rem;color:var(--blue2);margin-top:6px;font-family:var(--font-mono);font-weight:600">'+fmt(dtv)+'</div>'
+          +'<div style="font-size:0.65rem;color:var(--muted);margin-top:3px">Clique no produto para detalhar</div>'
+          +'</div>';
+      }
+      return '<div style="background:var(--card);border:1.5px dashed var(--border2);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0.6">'
+        +'<div style="font-size:1.6rem">👆</div>'
+        +'<div style="font-size:0.68rem;color:var(--muted);text-align:center;font-family:var(--font-mono);line-height:1.5">Selecione um dia<br>+ produto para<br>ver o detalhe</div>'
+        +'</div>';
+    })()}
+  `;
+
+  // Chart
+  const datasets=prods.map((p,i)=>({
+    label:p.name,
+    data:days.map(d=>getDayData(p,d)),
+    borderColor:palette[i%palette.length],
+    backgroundColor:palette[i%palette.length]+'22',
+    fill:false,tension:0.4,pointRadius:3,pointHoverRadius:6,borderWidth:2
+  }));
+  if(charts['chartProdDaily']) charts['chartProdDaily'].destroy();
+  charts['chartProdDaily']=new Chart(document.getElementById('chartProdDaily'),{
+    type:'line',data:{labels:dayLabels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:600},
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,position:'top',labels:{color:'#b0bcc8',font:{family:"'Nunito Sans',sans-serif",size:11,weight:'600'},boxWidth:12,padding:14,usePointStyle:true}},
+        tooltip:{backgroundColor:'#1e2235',titleColor:'#e2e8f0',bodyColor:'#a0aabb',borderColor:'#2e3250',borderWidth:1,padding:12,
+          titleFont:{family:"'Nunito Sans',sans-serif",size:12,weight:'700'},
+          bodyFont:{family:"'Nunito Sans',sans-serif",size:11},
+          callbacks:{label:c=>c.parsed.y>0?` ${c.dataset.label.slice(0,35)}: ${isVal?fmt(c.parsed.y):num(c.parsed.y)+' pçs'}`:null}}
+      },
+      scales:{
+        x:{grid:{color:'rgba(30,34,53,0.8)'},ticks:{color:'#7a8699',font:{family:"'Nunito Sans',sans-serif",size:10},maxRotation:45}},
+        y:{grid:{color:'rgba(30,34,53,0.8)'},ticks:{color:'#7a8699',font:{family:"'Nunito Sans',sans-serif",size:10},callback:v=>isVal?fmt(v):num(v)+'pç'}}
+      }
+    }
+  });
+
+  // Ranking table
+  const ranked=[...prods].map(p=>({...p,periodVal:getPeriodVal(p)})).sort((a,b)=>b.periodVal-a.periodVal);
+  const maxV=ranked[0]?.periodVal||1;
+  const totV=ranked.reduce((a,b)=>a+b.periodVal,0);
+  document.getElementById('prodRankTable').innerHTML=`
+    <thead><tr>
+      <th>#</th><th>Código</th><th>Produto</th>
+      <th>Faturamento</th>
+      <th style="color:var(--green)">Qtd A1+A3 ${isMar?'Mar':'Abr'}</th>
+      <th style="width:28%">Participação</th>
+    </tr></thead>
+    <tbody>${ranked.map((p,i)=>`<tr>
+      <td><span class="rank-badge ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i+1}</span></td>
+      <td style="font-family:var(--font-mono);font-size:0.7rem;color:var(--muted2)">${p.cod}</td>
+      <td style="font-weight:600;color:var(--text);font-size:0.8rem">${p.name}</td>
+      <td style="font-family:var(--font-mono);color:${isGelado?'#06b6d4':'#f97316'};font-weight:700">${fmt(isMar?Object.values(p.daily_mar||{}).reduce((a,b)=>a+b,0):Object.values(p.daily_apr||{}).reduce((a,b)=>a+b,0))}</td>
+      <td style="font-family:var(--font-mono);font-weight:700;color:var(--green)">${num(isMar?p.qtd_a1a3_mar||0:p.qtd_a1a3_abr||0)} pçs</td>
+      <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${totV>0?(p.periodVal/maxV*100).toFixed(0):0}%;background:${palette[i%palette.length]}"></div></div><span class="pct-text">${totV>0?(p.periodVal/totV*100).toFixed(1):0}%</span></div></td>
+    </tr>`).join('')}</tbody>`;
+}
+
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window._currentData=BUILTIN;
+window._compData=BUILTIN;
+window._vendData=BUILTIN;
+window._alData=BUILTIN;
+
+// Override section renders to use loaded data
+window.showSection=function(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  const [t,s]=pageTitles[id];
+  document.getElementById('pageTitle').textContent=t;
+  document.getElementById('pageSub').textContent=s;
+  const d=window._currentData||BUILTIN;
+  if(id==='comparison') renderComparison(d);
+  if(id==='vendors') renderVendors(d);
+  if(id==='alerts') renderAlerts(d);
+  if(id==='products') renderProducts();
+  if(id==='carteira'){ cwBuildDiaOptions(); renderCarteira(); }
+};
+
+renderOverview(BUILTIN);
+
+// ─── CARTEIRA ─────────────────────────────────────────────────────────────────
+const GELADO_CODES = ['PA04050001','PA04050002','PA04050003','PA04050004'];
+let _cwMes = 'todos', _cwGrupo = 'ambos', _cwDia = 'todos';
+
+function cwBuildDiaOptions(){
+  const sel = document.getElementById('cw-select-dia');
+  sel.innerHTML = '<option value="todos">Todos os dias</option>';
+  if(_cwMes==='todos'||_cwMes==='mar'){
+    const grp = document.createElement('optgroup'); grp.label='── Março ──';
+    for(let d=1;d<=31;d++) { const o=document.createElement('option'); o.value='mar-'+d; o.textContent=d+'/03'; grp.appendChild(o); }
+    sel.appendChild(grp);
+  }
+  if(_cwMes==='todos'||_cwMes==='abr'){
+    const grp = document.createElement('optgroup'); grp.label='── Abril ──';
+    for(let d=1;d<=30;d++) { const o=document.createElement('option'); o.value='abr-'+d; o.textContent=d+'/04'; grp.appendChild(o); }
+    sel.appendChild(grp);
+  }
+  // restore selection if still valid
+  const current = [...sel.options].find(o=>o.value===_cwDia);
+  sel.value = current ? _cwDia : 'todos';
+  if(!current) _cwDia = 'todos';
+  document.getElementById('cw-btn-clear-dia').style.display = _cwDia!=='todos'?'inline-block':'none';
+}
+
+function cwSetMes(m){
+  _cwMes = m;
+  _cwDia = 'todos';
+  ['todos','mar','abr'].forEach(x=>{
+    const b = document.getElementById('cw-btn-'+x);
+    b.className = 'pg-btn' + (x===m?' pg-active-blue':'');
+  });
+  cwBuildDiaOptions();
+  renderCarteira();
+}
+function cwSetGrupo(g){
+  _cwGrupo = g;
+  ['ambos','gelado','seco'].forEach(x=>{
+    const b = document.getElementById('cw-btn-'+x);
+    const active = x===g;
+    if(x==='gelado') b.className = 'pg-btn'+(active?' pg-active-cyan':'');
+    else if(x==='seco') b.className = 'pg-btn'+(active?' pg-active-orange':'');
+    else b.className = 'pg-btn'+(active?' pg-active-blue':'');
+  });
+  renderCarteira();
+}
+function cwSetDia(v){
+  _cwDia = v;
+  document.getElementById('cw-select-dia').value = v;
+  document.getElementById('cw-btn-clear-dia').style.display = v!=='todos'?'inline-block':'none';
+  renderCarteira();
+}
+
+function cwGetProds(){
+  const gelado = PRODUCTS.gelado || [];
+  const seco   = PRODUCTS.seco   || [];
+  if(_cwGrupo==='gelado') return gelado;
+  if(_cwGrupo==='seco')   return seco;
+  return [...gelado, ...seco];
+}
+
+function cwGetVal(p){
+  // Day filter active
+  if(_cwDia!=='todos'){
+    const [mon,d] = _cwDia.split('-');
+    const daily = mon==='mar' ? (p.daily_mar||{}) : (p.daily_apr||{});
+    return daily[d]||0;
+  }
+  if(_cwMes==='mar') return Object.values(p.daily_mar||{}).reduce((a,b)=>a+b,0);
+  if(_cwMes==='abr') return Object.values(p.daily_apr||{}).reduce((a,b)=>a+b,0);
+  return (Object.values(p.daily_mar||{}).reduce((a,b)=>a+b,0)) + (Object.values(p.daily_apr||{}).reduce((a,b)=>a+b,0));
+}
+function cwGetQtd(p){
+  // Day filter active
+  if(_cwDia!=='todos'){
+    const [mon,d] = _cwDia.split('-');
+    const dq = mon==='mar' ? (p.daily_qtd_mar||{}) : (p.daily_qtd_abr||{});
+    return dq[d]||0;
+  }
+  // Calcula direto dos dados diários (mais confiável que os campos pré-calculados)
+  const sumMar = Object.values(p.daily_qtd_mar||{}).reduce((a,b)=>a+b,0);
+  const sumAbr = Object.values(p.daily_qtd_abr||{}).reduce((a,b)=>a+b,0);
+  if(_cwMes==='mar') return sumMar;
+  if(_cwMes==='abr') return sumAbr;
+  return sumMar + sumAbr;
+}
+
+function renderCarteira(){
+  const prods = cwGetProds();
+  const isGelado = _cwGrupo==='gelado';
+  const isSeco   = _cwGrupo==='seco';
+  const colorMain = isGelado ? '#06b6d4' : isSeco ? '#f97316' : '#4f8ef7';
+  const colorSec  = isGelado ? '#22d3ee' : isSeco ? '#fb923c' : '#a855f7';
+
+  // ── Label ──
+  const diaLabel = _cwDia!=='todos' ? ` · Dia ${_cwDia.replace('mar-','/03').replace('abr-','/04')}` : '';
+  const mesLabel = _cwMes==='mar'?'Março':_cwMes==='abr'?'Abril':'Mar+Abr';
+  document.getElementById('cw-filter-label').textContent = `A1+A3 · ${mesLabel}${diaLabel}`;
+
+  // ── KPIs ──
+  const totalVal  = prods.reduce((a,p)=>a+cwGetVal(p),0);
+  const totalQtd  = prods.reduce((a,p)=>a+cwGetQtd(p),0);
+  const numProds  = prods.length;
+  const ticketMed = totalQtd>0 ? totalVal/totalQtd : 0;
+  const topProd   = [...prods].sort((a,b)=>cwGetVal(b)-cwGetVal(a))[0];
+  const gelVal    = (PRODUCTS.gelado||[]).reduce((a,p)=>a+cwGetVal(p),0);
+  const secoVal   = (PRODUCTS.seco||[]).reduce((a,p)=>a+cwGetVal(p),0);
+
+  const kpiDefs = [
+    {label:'Faturamento A1+A3', val:fmt(totalVal), sub:'Total no período', color:'#4f8ef7', icon:'💰'},
+    {label:'Qtd. de Peças', val:num(totalQtd), sub:'Unidades produzidas', color:'#22c55e', icon:'📦'},
+    {label:'Ticket Médio/Peça', val:fmt(ticketMed), sub:'Valor por unidade', color:'#a855f7', icon:'🎯'},
+    {label:'Produtos Ativos', val:numProds, sub:'SKUs no período', color:'#f97316', icon:'🔬'},
+    {label:'Top Produto', val:topProd ? topProd.name.split(' ').slice(0,3).join(' ')+'…' : '—', sub:topProd?fmt(cwGetVal(topProd)):'', color:'#eab308', icon:'🏆'},
+  ];
+  document.getElementById('cw-kpis').innerHTML = kpiDefs.map(k=>`
+    <div class="kpi" style="border-color:${k.color}22">
+      <div class="kpi-accent" style="background:${k.color}"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="kpi-label">${k.label}</div>
+        <span style="font-size:1.2rem">${k.icon}</span>
+      </div>
+      <div class="kpi-value" style="font-size:${k.label==='Top Produto'?'0.9rem':'1.4rem'};color:${k.color}">${k.val}</div>
+      <div class="kpi-sub" style="margin-top:6px;color:var(--muted2);font-size:0.65rem">${k.sub}</div>
+    </div>`).join('');
+
+  // ── Gráfico Evolução Diária ──
+  const allDays_mar = Array.from({length:31},(_,i)=>i+1);
+  const allDays_abr = Array.from({length:30},(_,i)=>i+1);
+  let labels, datasets;
+
+  if(_cwDia !== 'todos'){
+    // Modo dia único: mostra valor de cada produto nesse dia
+    const [diaMon, diaD] = _cwDia.split('-');
+    const diaNum = parseInt(diaD);
+    const diaMes = diaMon === 'mar' ? '/03' : '/04';
+    const diaLabels = prods.map(p=>p.name.length>18?p.name.slice(0,16)+'…':p.name);
+    const diaVals   = prods.map(p=>{
+      const daily = diaMon==='mar'?(p.daily_mar||{}):(p.daily_apr||{});
+      return daily[diaD]||0;
+    });
+    const diaColor = diaMon==='mar'?'rgba(79,142,247,0.7)':'rgba(34,197,94,0.7)';
+    const diaBorder = diaMon==='mar'?'#4f8ef7':'#22c55e';
+    mkChart('cw-chart-daily','bar',
+      {labels:diaLabels, datasets:[{label:`${diaNum}${diaMes}`,data:diaVals,backgroundColor:diaColor,borderColor:diaBorder,borderWidth:1.5,borderRadius:4}]},
+      {plugins:{...CD.plugins,legend:{display:true,labels:{color:'#8892a4',font:{size:10},boxWidth:10}},
+        tooltip:{...CD.plugins.tooltip,callbacks:{label:c=>` ${fmt(c.parsed.y)}`}}},
+       scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:8},maxRotation:45}},
+               y:{...CD.scales.y,ticks:{callback:v=>fmt(v),color:'#5a6480',font:{size:9}}}}}
+    );
+  } else {
+    datasets = [];
+    if(_cwMes==='mar'||_cwMes==='todos'){
+      const marData = allDays_mar.map(d=>prods.reduce((a,p)=>a+(p.daily_mar&&p.daily_mar[d]?p.daily_mar[d]:0),0));
+      datasets.push({label:'Março',data:marData,backgroundColor:'rgba(79,142,247,0.6)',borderColor:'#4f8ef7',borderWidth:1.5,borderRadius:4});
+    }
+    if(_cwMes==='abr'||_cwMes==='todos'){
+      const abrData = allDays_abr.map(d=>prods.reduce((a,p)=>a+(p.daily_apr&&p.daily_apr[d]?p.daily_apr[d]:0),0));
+      datasets.push({label:'Abril',data:abrData,backgroundColor:'rgba(34,197,94,0.6)',borderColor:'#22c55e',borderWidth:1.5,borderRadius:4});
+    }
+    labels = _cwMes==='abr' ? allDays_abr.map(d=>d+'/04') :
+             _cwMes==='mar' ? allDays_mar.map(d=>d+'/03') :
+             [...allDays_mar.map(d=>d+'/03'),...allDays_abr.map(d=>d+'/04')];
+    if(_cwMes==='todos'){
+      const marFull = allDays_mar.map(d=>prods.reduce((a,p)=>a+(p.daily_mar&&p.daily_mar[d]?p.daily_mar[d]:0),0));
+      const abrFull = allDays_abr.map(d=>prods.reduce((a,p)=>a+(p.daily_apr&&p.daily_apr[d]?p.daily_apr[d]:0),0));
+      datasets = [
+        {label:'Março',data:[...marFull,...Array(30).fill(0)],backgroundColor:'rgba(79,142,247,0.6)',borderColor:'#4f8ef7',borderWidth:1.5,borderRadius:3},
+        {label:'Abril',data:[...Array(31).fill(0),...abrFull],backgroundColor:'rgba(34,197,94,0.6)',borderColor:'#22c55e',borderWidth:1.5,borderRadius:3}
+      ];
+    }
+    mkChart('cw-chart-daily','bar',{labels,datasets},{
+      plugins:{...CD.plugins,legend:{display:true,labels:{color:'#8892a4',font:{size:10},boxWidth:10}},
+      tooltip:{...CD.plugins.tooltip,callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.parsed.y)}`}}},
+      scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:8},maxRotation:45}},y:{...CD.scales.y,ticks:{callback:v=>fmt(v),color:'#5a6480',font:{size:9}}}}
+    });
+  }
+
+  // ── Ranking por quantidade ──
+  const prodsSorted = [...prods].sort((a,b)=>cwGetQtd(b)-cwGetQtd(a)).slice(0,10);
+  const palette = isGelado?['#06b6d4','#22d3ee','#67e8f9','#0891b2','#0e7490','#a5f3fc']:
+                  isSeco?  ['#f97316','#fb923c','#a855f7','#c084fc','#4f8ef7','#22c55e','#eab308','#ec4899','#10b981','#3b82f6']:
+                           PALETTE;
+  mkChart('cw-chart-qtd-rank','bar',
+    {labels:prodsSorted.map(p=>p.name.length>22?p.name.slice(0,20)+'…':p.name),
+     datasets:[{data:prodsSorted.map(p=>cwGetQtd(p)),backgroundColor:palette,borderRadius:5,borderWidth:0}]},
+    {indexAxis:'y',
+     plugins:{
+       ...CD.plugins,
+       tooltip:{...CD.plugins.tooltip,callbacks:{label:c=>` ${num(c.parsed.x)} peças`}}
+     },
+     scales:{x:{...CD.scales.x,ticks:{color:'#5a6480',font:{size:9},callback:v=>num(v)}},
+             y:{grid:{display:false},ticks:{color:'#8892a4',font:{size:9}}}}
+    }
+  );
+  // Desenhar labels diretamente após criar o chart
+  const qtdChart = charts['cw-chart-qtd-rank'];
+  if(qtdChart){
+    const origDraw = qtdChart.draw.bind(qtdChart);
+    qtdChart.draw = function(){
+      origDraw();
+      const {ctx:c2d, data} = qtdChart;
+      c2d.save();
+      c2d.font = '600 10px "Nunito Sans", sans-serif';
+      c2d.fillStyle = '#e8ecf4';
+      c2d.textBaseline = 'middle';
+      data.datasets[0].data.forEach((val,i)=>{
+        if(!val) return;
+        const meta = qtdChart.getDatasetMeta(0);
+        const bar  = meta.data[i];
+        c2d.fillText(num(val)+' pçs', bar.x + 6, bar.y);
+      });
+      c2d.restore();
+    };
+    qtdChart.draw();
+  }
+
+  // ── Donut PRÉ PRODUÇÃO vs EM PRODUÇÃO ──
+  // Recalcula a partir dos produtos filtrados usando cwGetVal (respeita mes/dia/grupo)
+  const allProdsForDonut = [...(PRODUCTS.gelado||[]), ...(PRODUCTS.seco||[])];
+  // PRÉ PRODUÇÃO = qtd_a1a3_mar/abr/todos (A1), EM PRODUÇÃO = items that have daily values (A3)
+  // Usando grupoVal do BUILTIN proporcional ao filtro aplicado
+  const grupoValBase = window._currentData?.grupoVal || BUILTIN.grupoVal;
+  const totalBase = (grupoValBase['PRÉ PRODUÇÃO']||0) + (grupoValBase['EM PRODUÇÃO']||0);
+  // Recalcular com base no valor total filtrado
+  const totalFiltrado = prods.reduce((a,p)=>a+cwGetVal(p),0);
+  const ratioA1 = totalBase>0 ? (grupoValBase['PRÉ PRODUÇÃO']||0)/totalBase : 0.5;
+  const ratioA3 = totalBase>0 ? (grupoValBase['EM PRODUÇÃO']||0)/totalBase  : 0.5;
+  const a1Val = totalFiltrado * ratioA1;
+  const a3Val = totalFiltrado * ratioA3;
+  mkChart('cw-chart-donut-grupo','doughnut',
+    {labels:['PRÉ PRODUÇÃO','EM PRODUÇÃO'],
+     datasets:[{data:[a1Val,a3Val],backgroundColor:['#eab308','#06b6d4'],borderWidth:3,borderColor:'#12141e'}]},
+    {cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed)} (${((c.parsed/(a1Val+a3Val))*100).toFixed(1)}%)`}}}}
+  );
+  document.getElementById('cw-donut-legend').innerHTML=`
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem"><span style="width:10px;height:10px;border-radius:50%;background:#eab308;display:inline-block"></span><span style="color:var(--muted2)">PRÉ PROD. ${fmt(a1Val)}</span></div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem"><span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;display:inline-block"></span><span style="color:var(--muted2)">EM PROD. ${fmt(a3Val)}</span></div>`;
+
+  // ── Donut Gelado vs Seco ──
+  const gVal = (PRODUCTS.gelado||[]).reduce((a,p)=>a+cwGetVal(p),0);
+  const sVal = (PRODUCTS.seco||[]).reduce((a,p)=>a+cwGetVal(p),0);
+  mkChart('cw-chart-donut-tipo','doughnut',
+    {labels:['❄ Gelado','☀ Seco'],
+     datasets:[{data:[gVal,sVal],backgroundColor:['#06b6d4','#f97316'],borderWidth:3,borderColor:'#12141e'}]},
+    {cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.parsed)} (${((c.parsed/(gVal+sVal))*100).toFixed(1)}%)`}}}}
+  );
+  document.getElementById('cw-tipo-legend').innerHTML=`
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem"><span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;display:inline-block"></span><span style="color:var(--muted2)">Gelado ${fmt(gVal)}</span></div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem"><span style="width:10px;height:10px;border-radius:50%;background:#f97316;display:inline-block"></span><span style="color:var(--muted2)">Seco ${fmt(sVal)}</span></div>`;
+
+  // ── Top 5 por valor ──
+  const top5 = [...prods].sort((a,b)=>cwGetVal(b)-cwGetVal(a)).slice(0,5);
+  const maxTop = cwGetVal(top5[0])||1;
+  document.getElementById('cw-top5-val').innerHTML = top5.map((p,i)=>{
+    const pct = (cwGetVal(p)/maxTop*100).toFixed(0);
+    const col = palette[i%palette.length];
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:0.72rem;color:var(--text);font-weight:600">${p.name.length>30?p.name.slice(0,28)+'…':p.name}</span>
+        <span style="font-family:var(--font-mono);font-size:0.7rem;color:${col};font-weight:700">${fmt(cwGetVal(p))}</span>
+      </div>
+      <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;transition:width .6s ease"></div>
+      </div>
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:2px">${num(cwGetQtd(p))} peças · ${p.cod}</div>
+    </div>`;
+  }).join('');
+
+  // ── Tabela completa ──
+  const allProds = [...prods].sort((a,b)=>cwGetVal(b)-cwGetVal(a));
+  const grandTot = allProds.reduce((a,p)=>a+cwGetVal(p),0);
+  const grandQtd = allProds.reduce((a,p)=>a+cwGetQtd(p),0);
+  document.getElementById('cw-table-total').textContent = `${allProds.length} produtos · ${fmt(grandTot)} · ${num(grandQtd)} peças`;
+  const isGeladoCod = cod => GELADO_CODES.includes(cod);
+  document.getElementById('cw-table').innerHTML=`
+    <thead><tr>
+      <th>#</th>
+      <th>Tipo</th>
+      <th>Código</th>
+      <th>Produto</th>
+      <th>Faturamento</th>
+      <th>Qtd Peças</th>
+      <th>Ticket Médio/Pç</th>
+      <th style="width:18%">Part. %</th>
+    </tr></thead>
+    <tbody>${allProds.map((p,i)=>{
+      const v=cwGetVal(p), q=cwGetQtd(p), tick=q>0?v/q:0;
+      const pct=(grandTot>0?(v/grandTot*100):0).toFixed(1);
+      const isG = isGeladoCod(p.cod);
+      const col = isG?'#06b6d4':'#f97316';
+      const barW = grandTot>0?(v/cwGetVal(allProds[0])*100).toFixed(0):0;
+      return `<tr>
+        <td><span class="rank-badge ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i+1}</span></td>
+        <td><span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:4px;background:${isG?'rgba(6,182,212,0.15)':'rgba(249,115,22,0.12)'};color:${col};border:1px solid ${col}33">${isG?'❄ GEL':'☀ SEC'}</span></td>
+        <td style="font-family:var(--font-mono);font-size:0.68rem;color:var(--muted2)">${p.cod}</td>
+        <td style="font-weight:600;font-size:0.78rem">${p.name}</td>
+        <td style="font-family:var(--font-mono);color:${col};font-weight:700">${fmt(v)}</td>
+        <td style="font-family:var(--font-mono);color:var(--green);font-weight:600">${num(q)} pçs</td>
+        <td style="font-family:var(--font-mono);color:var(--muted2);font-size:0.72rem">${fmt(tick)}</td>
+        <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${col}"></div></div><span class="pct-text">${pct}%</span></div></td>
+      </tr>`;
+    }).join('')}</tbody>
+    <tfoot><tr style="border-top:2px solid var(--border2)">
+      <td colspan="4" style="font-weight:700;font-size:0.78rem;color:var(--text);padding-top:10px">TOTAL</td>
+      <td style="font-family:var(--font-mono);color:#4f8ef7;font-weight:800">${fmt(grandTot)}</td>
+      <td style="font-family:var(--font-mono);color:var(--green);font-weight:800">${num(grandQtd)} pçs</td>
+      <td style="font-family:var(--font-mono);color:var(--muted2)">${fmt(grandQtd>0?grandTot/grandQtd:0)}</td>
+      <td style="font-family:var(--font-mono);color:var(--muted)">100%</td>
+    </tr></tfoot>`;
+}
+
+
+
+</script>
+</body></html>
